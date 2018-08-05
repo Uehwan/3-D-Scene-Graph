@@ -64,6 +64,7 @@ parser.add_argument('--optimizer', type=int, default=0, help='which optimizer us
 
 
 parser.add_argument('--evaluate', action='store_true', help='Only use the testing mode')
+parser.add_argument('--only_predicate', action='store_true', help='evaluate only predicate')
 args = parser.parse_args()
 # Overall loss logger
 overall_train_loss = network.AverageMeter()
@@ -97,29 +98,29 @@ def main():
 
     # Model declaration
     net = Hierarchical_Descriptive_Model(nhidden=args.mps_feature_len,
-                 n_object_cats=train_set.num_object_classes, 
-                 n_predicate_cats=train_set.num_predicate_classes, 
+                 n_object_cats=train_set.num_object_classes,
+                 n_predicate_cats=train_set.num_predicate_classes,
                  n_vocab=train_set.voc_size,
                  voc_sign=train_set.voc_sign,
-                 max_word_length=train_set.max_size, 
-                 MPS_iter=args.MPS_iter, 
+                 max_word_length=train_set.max_size,
+                 MPS_iter=args.MPS_iter,
                  use_language_loss=not args.disable_language_model,
-                 object_loss_weight=train_set.inverse_weight_object, 
+                 object_loss_weight=train_set.inverse_weight_object,
                  predicate_loss_weight=train_set.inverse_weight_predicate,
-                 dropout=args.dropout, 
-                 use_kmeans_anchors=not args.use_normal_anchors, 
-                 gate_width = args.gate_width, 
-                 nhidden_caption = args.nhidden_caption, 
+                 dropout=args.dropout,
+                 use_kmeans_anchors=not args.use_normal_anchors,
+                 gate_width = args.gate_width,
+                 nhidden_caption = args.nhidden_caption,
                  nembedding = args.nembedding,
-                 rnn_type=args.rnn_type, 
-                 rnn_droptout=args.caption_use_dropout, rnn_bias=args.caption_use_bias, 
-                 use_region_reg = args.region_bbox_reg, 
+                 rnn_type=args.rnn_type,
+                 rnn_droptout=args.caption_use_dropout, rnn_bias=args.caption_use_bias,
+                 use_region_reg = args.region_bbox_reg,
                  use_kernel = args.use_kernel_function)
 
     params = list(net.parameters())
     for param in params:
         print param.size()
-    print net 
+    print net
 
     # To group up the features
     vgg_features_fix, vgg_features_var, rpn_features, hdn_features, language_features = group_features(net)
@@ -142,14 +143,14 @@ def main():
             raise Exception('[resume_model] not specified')
         network.load_net(args.resume_model, net)
         optimizer_select = 3
-        
+
 
     elif args.load_RPN:
         print 'Loading pretrained RPN: {}'.format(args.saved_model_path)
         args.train_all = False
         network.load_net(args.saved_model_path, net.rpn)
         net.reinitialize_fc_layers()
-        optimizer_select = 1       
+        optimizer_select = 1
 
 
     elif args.resume_training:
@@ -167,7 +168,7 @@ def main():
         optimizer_select = 0
         args.train_all = True
 
-    optimizer = network.get_optimizer(lr,optimizer_select, args, 
+    optimizer = network.get_optimizer(lr,optimizer_select, args,
                 vgg_features_var, rpn_features, hdn_features, language_features)
 
     target_net = net
@@ -181,7 +182,7 @@ def main():
 
     if args.evaluate:
         recall = test(test_loader, net, top_Ns)
-        print('======= Testing Result =======') 
+        print('======= Testing Result =======')
         for idx, top_N in enumerate(top_Ns):
             print('[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
                 top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
@@ -197,6 +198,18 @@ def main():
             print('save model: {}'.format(save_name))
 
 
+
+
+
+
+
+
+
+
+
+
+
+
             # Testing
             # network.set_trainable(net, False) # Without backward(), requires_grad takes no effect
 
@@ -208,7 +221,7 @@ def main():
                 network.save_net(save_name, net)
                 print('\nsave model: {}'.format(save_name))
 
-            print('Epoch[{epoch:d}]:'.format(epoch = epoch)), 
+            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
             for idx, top_N in enumerate(top_Ns):
                 print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
                     top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100)),
@@ -218,16 +231,16 @@ def main():
                 lr /= 10
                 args.lr = lr
                 print '[learning rate: {}]'.format(lr)
-            
+
                 args.enable_clip_gradient = False
                 if not args.finetune_language_model:
                     args.train_all = True
                     optimizer_select = 2
-                # update optimizer and correponding requires_grad state   
-                optimizer = network.get_optimizer(lr, optimizer_select, args, 
+                # update optimizer and correponding requires_grad state
+                optimizer = network.get_optimizer(lr, optimizer_select, args,
                             vgg_features_var, rpn_features, hdn_features, language_features)
 
-        
+
 
 
 
@@ -310,7 +323,7 @@ def train(train_loader, target_net, optimizer, epoch):
                   '\tBatch_Time: {batch_time.avg: .3f}s\t'
                   'FRCNN Loss: {loss.avg: .4f}\t'
                   'RPN Loss: {rpn_loss.avg: .4f}'.format(
-                   epoch, i + 1, len(train_loader), batch_time=batch_time,lr=args.lr, 
+                   epoch, i + 1, len(train_loader), batch_time=batch_time,lr=args.lr,
                    loss=train_loss, rpn_loss=train_rpn_loss, solver=args.solver))
 
 
@@ -323,7 +336,7 @@ def train(train_loader, target_net, optimizer, epoch):
             if args.region_bbox_reg:
                 print('\tregion_box_loss: %.4f, ' % (train_region_box_loss.avg)),
             print('\tregion_objectness_loss: %.4f' % (train_region_objectiveness_loss.avg)),
-            
+
             print('\n\t[object]\ttp: %.2f, \ttf: %.2f, \tfg/bg=(%d/%d)' %
                   (accuracy_obj.ture_pos*100., accuracy_obj.true_neg*100., accuracy_obj.foreground, accuracy_obj.background))
             print('\t[predicate]\ttp: %.2f, \ttf: %.2f, \tfg/bg=(%d/%d)' %
@@ -337,7 +350,7 @@ def train(train_loader, target_net, optimizer, epoch):
             log_value('caption loss', overall_train_region_caption_loss.avg, overall_train_region_caption_loss.count)
 
 
-    
+
 
 
 
@@ -353,7 +366,7 @@ def test(test_loader, net, top_Ns):
     net.use_language_loss = False
     net.use_region_reg = False
 
-    
+
     rel_cnt = 0.
     rel_cnt_correct = np.zeros(len(top_Ns))
 
@@ -362,8 +375,8 @@ def test(test_loader, net, top_Ns):
     for i, (im_data, im_info, gt_objects, gt_relationships, gt_regions) in enumerate(test_loader):
         # Forward pass
         total_cnt_t, rel_cnt_correct_t = net.evaluate(
-            im_data, im_info, gt_objects.numpy()[0], gt_relationships.numpy()[0], gt_regions.numpy()[0], 
-            top_Ns = top_Ns, nms=True)
+            im_data, im_info, gt_objects.numpy()[0], gt_relationships.numpy()[0], gt_regions.numpy()[0],
+            top_Ns = top_Ns, nms=True,only_predicate=args.only_predicate)
         rel_cnt += total_cnt_t
         rel_cnt_correct += rel_cnt_correct_t
         batch_time.update(time.time() - end)

@@ -17,7 +17,7 @@ import network
 from network import Conv2d, FC
 # from roi_pooling.modules.roi_pool_py import RoIPool
 from roi_pooling.modules.roi_pool import RoIPool
-from vgg16 import VGG16
+#from vgg16 import VGG16
 import torchvision.models as models
 import torch.utils.model_zoo as model_zoo
 import math
@@ -57,13 +57,13 @@ class RPN(nn.Module):
         super(RPN, self).__init__()
 
         if use_kmeans_anchors:
-            print 'using k-means anchors'
+            print('using k-means anchors')
             self.anchor_scales = self.anchor_scales_kmeans
             self.anchor_ratios = self.anchor_ratios_kmeans
             self.anchor_scales_region = self.anchor_scales_kmeans_region
             self.anchor_ratios_region = self.anchor_ratios_kmeans_region
         else:
-            print 'using normal anchors'
+            print('using normal anchors')
             self.anchor_scales, self.anchor_ratios = \
                 np.meshgrid(self.anchor_scales_normal, self.anchor_ratios_normal, indexing='ij')
             self.anchor_scales = self.anchor_scales.reshape(-1)
@@ -124,33 +124,27 @@ class RPN(nn.Module):
     def forward(self, im_data, im_info, gt_objects=None, gt_regions=None, dontcare_areas=None):
 
 
-        im_data = Variable(im_data.cuda())
-
-        features = self.features(im_data)
-        # print 'features.std()', features.data.std()
-        rpn_conv1 = self.conv1(features)
-        # print 'rpn_conv1.std()', rpn_conv1.data.std()
+        im_data = Variable(im_data.cuda()) # [ 1 * 3 * img_w * img_h ]
+        ''' Get Conv features from VGG net '''
+        features = self.features(im_data) # [ 1 * 512 * feature_w * feature_h ]
+        ''' Object ROI Generation'''
+        rpn_conv1 = self.conv1(features) # [1 * 512 * feature_w * feature_h ]
         # object proposal score
-        rpn_cls_score = self.score_conv(rpn_conv1)
-        # print 'rpn_cls_score.std()', rpn_cls_score.data.std()
-        rpn_cls_score_reshape = self.reshape_layer(rpn_cls_score, 2)
-        rpn_cls_prob = F.softmax(rpn_cls_score_reshape)
-        rpn_cls_prob_reshape = self.reshape_layer(rpn_cls_prob, self.anchor_num*2)
+        rpn_cls_score = self.score_conv(rpn_conv1) # [ 1 * (2x25) * feature_w * feature_h ]
+        rpn_cls_score_reshape = self.reshape_layer(rpn_cls_score, 2) # [ 1 * 2 * (25 x feature_w) * feature_h ]
+        rpn_cls_prob = F.softmax(rpn_cls_score_reshape,dim=1) # [ 1 * 2 * (25 x feature_w) * feature_h ]
+        rpn_cls_prob_reshape = self.reshape_layer(rpn_cls_prob, self.anchor_num*2) # [ 1 * (2x25) * feature_w * feature_h ]
         # rpn boxes
-        rpn_bbox_pred = self.bbox_conv(rpn_conv1)
-        # print 'rpn_bbox_pred.std()', rpn_bbox_pred.data.std() * 4
-
-        rpn_conv1_region = self.conv1_region(features)
-        # print 'rpn_conv1_region.std()', rpn_conv1_region.data.std()
+        rpn_bbox_pred = self.bbox_conv(rpn_conv1) # [ 1 * (4x25) * feature_w * feature_h ]
+        ''' Region ROI Generation '''
+        rpn_conv1_region = self.conv1_region(features) # [ 1 * 512 * feature_w * feature_h ]
         # object proposal score
-        rpn_cls_score_region = self.score_conv(rpn_conv1_region)
-        # print 'rpn_cls_score_region.std()', rpn_cls_score_region.data.std()
-        rpn_cls_score_region_reshape = self.reshape_layer(rpn_cls_score_region, 2)
-        rpn_cls_prob_region = F.softmax(rpn_cls_score_region_reshape)
-        rpn_cls_prob_region_reshape = self.reshape_layer(rpn_cls_prob_region, self.anchor_num*2)
+        rpn_cls_score_region = self.score_conv(rpn_conv1_region) # [ 1 * (2x25) * feature_w * feature_h ]
+        rpn_cls_score_region_reshape = self.reshape_layer(rpn_cls_score_region, 2) # [ 1 * 2 * (25 x feature_w) * feature_h ]
+        rpn_cls_prob_region = F.softmax(rpn_cls_score_region_reshape,dim=1) # [ 1 * 2 * (25 x feature_w) * feature_h ]
+        rpn_cls_prob_region_reshape = self.reshape_layer(rpn_cls_prob_region, self.anchor_num*2) # [ 1 * (2x25) * feature_w * feature_h ]
         # rpn boxes
-        rpn_bbox_pred_region = self.bbox_conv(rpn_conv1_region)
-        # print 'rpn_bbox_pred_region.std()', rpn_bbox_pred_region.data.std() * 4
+        rpn_bbox_pred_region = self.bbox_conv(rpn_conv1_region) # [ 1 * (4x25) * feature_w * feature_h ]
 
         # proposal layer
         cfg_key = 'TRAIN' if self.training else 'TEST'
@@ -169,8 +163,8 @@ class RPN(nn.Module):
                                                 im_info, self.anchor_scales_region, self.anchor_ratios_region, \
                                                 self._feat_stride, is_region=True)
             if DEBUG:
-                print 'rpn_data', rpn_data
-                print 'rpn_cls_score_reshape', rpn_cls_score_reshape
+                print('rpn_data', rpn_data)
+                print('rpn_cls_score_reshape', rpn_cls_score_reshape)
 
             self.cross_entropy, self.loss_box = \
                 self.build_loss(rpn_cls_score_reshape, rpn_bbox_pred, rpn_data)
@@ -200,9 +194,9 @@ class RPN(nn.Module):
         error = torch.sum(torch.abs(predict - rpn_label.data))
         #  try:
         if predict.size()[0] < 256:
-            print predict.size()
-            print rpn_label.size()
-            print fg_cnt
+            print(predict.size())
+            print(rpn_label.size())
+            print(fg_cnt)
 
         if is_region:
             self.tp_region = torch.sum(predict[:fg_cnt].eq(rpn_label.data[:fg_cnt]))
@@ -210,14 +204,14 @@ class RPN(nn.Module):
             self.fg_cnt_region = fg_cnt
             self.bg_cnt_region = bg_cnt
             if DEBUG:
-                print 'accuracy: %2.2f%%' % ((self.tp + self.tf) / float(fg_cnt + bg_cnt) * 100)
+                print('accuracy: %2.2f%%' % ((self.tp + self.tf) / float(fg_cnt + bg_cnt) * 100))
         else:
             self.tp = torch.sum(predict[:fg_cnt].eq(rpn_label.data[:fg_cnt]))
             self.tf = torch.sum(predict[fg_cnt:].eq(rpn_label.data[fg_cnt:]))
             self.fg_cnt = fg_cnt
             self.bg_cnt = bg_cnt
             if DEBUG:
-                print 'accuracy: %2.2f%%' % ((self.tp + self.tf) / float(fg_cnt + bg_cnt) * 100)
+                print('accuracy: %2.2f%%' % ((self.tp + self.tf) / float(fg_cnt + bg_cnt) * 100))
 
         rpn_cross_entropy = F.cross_entropy(rpn_cls_score, rpn_label)
         # print rpn_cross_entropy

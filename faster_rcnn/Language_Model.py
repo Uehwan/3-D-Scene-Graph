@@ -124,7 +124,7 @@ class Language_Model(nn.Module):
             input_x = self.encoder(x.view(1, -1))
             output_feature, hidden_feat = self.lstm_word(input_x, hidden_feat)
             output_t = self.decoder(output_feature.view(-1, output_feature.size(2)))
-            output_t = F.log_softmax(output_t)
+            output_t = F.log_softmax(output_t,dim=1)
             logprob, x = output_t.max(1)
             output.append(x)
             flag[x.cpu().eq(self.end).data] = 0

@@ -29,10 +29,19 @@ from roi_pooling.modules.roi_pool import RoIPool
 from vgg16 import VGG16
 from MSDN_base import HDN_base
 import pdb
+from sort.sort import Sort, iou
 
 DEBUG = False
 TIME_IT = cfg.TIME_IT
 
+
+
+def filter_untracted(ref_bbox, tobefiltered_bbox):
+    keep = []
+    for bbox in ref_bbox:
+        ious = [iou(bbox[:4], obj_box) for obj_box in tobefiltered_bbox]
+        keep.append(np.argmax(ious))
+    return keep
 
 def nms_detections(pred_boxes, scores, nms_thresh, inds=None):
     dets = np.hstack((pred_boxes,
@@ -103,9 +112,10 @@ class Hierarchical_Descriptive_Model(HDN_base):
 
         self.objectiveness_loss = None
 
+        # Initial Sort tracker
+        self.tracker = Sort()
 
-
-    def forward(self, im_data, im_info, gt_objects=None, gt_relationships=None, gt_regions=None, 
+    def forward(self, im_data, im_info, gt_objects=None, gt_relationships=None, gt_regions=None,
                     use_beam_search=False, graph_generation=False):
 
         self.timer.tic()
@@ -256,7 +266,7 @@ class Hierarchical_Descriptive_Model(HDN_base):
             else:
                 self.MPS_iter = cfg.TEST.MPS_ITER_NUM
 
-        for i in xrange(self.MPS_iter):
+        for i in range(self.MPS_iter):
             pooled_object_features, pooled_phrase_features, pooled_region_features = \
                 self.mps(pooled_object_features, pooled_phrase_features, pooled_region_features, \
                             mat_object, mat_phrase, mat_region)
@@ -276,10 +286,10 @@ class Hierarchical_Descriptive_Model(HDN_base):
         pooled_region_features = F.relu(pooled_region_features)
 
         cls_score_object = self.score_obj(pooled_object_features)
-        cls_prob_object = F.softmax(cls_score_object)
+        cls_prob_object = F.softmax(cls_score_object,dim=1)
 
         cls_score_predicate = self.score_pred(pooled_phrase_features)
-        cls_prob_predicate = F.softmax(cls_score_predicate)
+        cls_prob_predicate = F.softmax(cls_score_predicate,dim=1)
 
         if not self.use_region_reg:
             bbox_region = Variable(torch.zeros(pooled_region_features.size(0), 4).cuda())
@@ -332,7 +342,7 @@ class Hierarchical_Descriptive_Model(HDN_base):
                 region_caption = None
                 caption_logprobs = None 
 
-        caption_logprobs = F.log_softmax(cls_objectiveness_region)[:, 1].squeeze().cpu().data
+        caption_logprobs = F.log_softmax(cls_objectiveness_region,dim=1)[:, 1].squeeze().cpu().data
 
         return (cls_prob_object, bbox_object, object_rois), \
                 (cls_prob_predicate, mat_phrase), \
@@ -462,10 +472,143 @@ class Hierarchical_Descriptive_Model(HDN_base):
         
 
         return pred_boxes, scores, inds, subject_inds, object_inds, subject_boxes, object_boxes, predicate_inds
-               
+
+    def interpret_graph(self, cls_prob_object, bbox_object, object_rois, cls_prob_predicate,
+                        mat_phrase, im_info, nms=True, clip=True, min_score=0.01,
+                        top_N=100, use_gt_boxes=False):
+        scores, inds = cls_prob_object[:, 0:].data.max(1) # [ 64 ] , [ 64 ]
+        #inds += 1
+        scores, inds = scores.cpu().numpy(), inds.cpu().numpy()
+        predicate_scores, predicate_inds = cls_prob_predicate[:, 0:].data.max(1) # [ 4032 ] , [ 4032 ]
+        #predicate_inds += 1
+        predicate_scores, predicate_inds = predicate_scores.cpu().numpy(), predicate_inds.cpu().numpy()
+
+        # Eliminate elements with values less than min_score
+        keep = np.where((inds > 0) & (scores >= min_score))
+        scores, inds = scores[keep], inds[keep] # [ num_keeped ] , [ num_keeped ]
+
+        # Apply bounding-box regression deltas
+        keep = keep[0]
+        box_deltas = bbox_object.data.cpu().numpy()[keep]
+        box_deltas = np.asarray([
+            box_deltas[i, (inds[i] * 4): (inds[i] * 4 + 4)] for i in range(len(inds))
+        ], dtype=np.float) # [ 64 * 4 ]
+        boxes = object_rois.data.cpu().numpy()[keep, 1:5] / im_info[0][2] # [ 1 * num_keeped * 4 ]
+        if use_gt_boxes:
+            nms = False
+            clip = False
+            pred_boxes = boxes
+        else:
+            pred_boxes = bbox_transform_inv_hdn(boxes, box_deltas) # [ num_keeped * 4 ]
+
+        if clip:
+            # bbox is clipped to image boundaries
+            pred_boxes = clip_boxes(pred_boxes, im_info[0][:2] / im_info[0][2]) # [ num_keeped * 4 ]
+
+        # Apply Non Maximal Suppression (NMS)
+        if nms and pred_boxes.shape[0] > 0:
+            pred_boxes, scores, inds, keep_keep = nms_detections(pred_boxes, scores, 0.30, inds=inds)
+            # [ num_keeped_nms * 4 ] , [ num_keeped_nms ] , [ num_keeped_nms ] , list with length 10
+            keep = keep[keep_keep] # [ num_keeped_nms ]
+
+        sub_list = np.array([], dtype=int)
+        obj_list = np.array([], dtype=int)
+        pred_list = np.array([], dtype=int)
+
+        for i in range(mat_phrase.shape[0]):
+            sub_id = np.where(keep == mat_phrase[i, 0])[0]
+            obj_id = np.where(keep == mat_phrase[i, 1])[0]
+            if len(sub_id) > 0 and len(obj_id) > 0:
+                sub_list = np.append(sub_list, sub_id[0])
+                obj_list = np.append(obj_list, obj_id[0])
+                pred_list = np.append(pred_list, i)
+
+        # Calculate triplet scores
+        # A total_score = subject_score * predicate_score * object_score
+        # A triplet_score = (subject_score , predicate_score , object_score)
+        total_scores = scores[sub_list].squeeze() * \
+                       predicate_scores.squeeze()[pred_list] * \
+                       scores[obj_list].squeeze()
+        triplet_scores = np.array([scores[sub_list].squeeze(),
+                          predicate_scores.squeeze()[pred_list],
+                          scores[obj_list].squeeze()]).transpose()
+        # Sort the lists in descending order of their score.
+        sorted_list = total_scores.argsort()[::-1]
+        triplet_scores = triplet_scores[sorted_list]
+        pred_list = pred_list[sorted_list]
+        sub_list = sub_list[sorted_list]
+        obj_list = obj_list[sorted_list]
 
 
-    def interpret_result(self, cls_prob, bbox_pred, rois, cls_prob_predicate, 
+
+        # Object tracking
+        # Filter out all un-tracked objects and triplets
+        tracking_input = np.concatenate((pred_boxes, scores.reshape(len(scores), 1)), axis=1)
+        bboxes_and_uniqueIDs = self.tracker.update(tracking_input)
+        keep = filter_untracted(bboxes_and_uniqueIDs, pred_boxes)
+        keep_sub = [np.where(sub_list == keep_idx) for keep_idx in keep]
+        keep_sub = np.concatenate(keep_sub, axis=1).flatten()
+        pred_list, sub_list, obj_list = pred_list[keep_sub], sub_list[keep_sub], obj_list[keep_sub]
+        keep_obj = [np.where(obj_list == keep_idx) for keep_idx in keep]
+        keep_obj = np.concatenate(keep_obj, axis=1).flatten()
+        pred_list, sub_list, obj_list = pred_list[keep_obj], sub_list[keep_obj], obj_list[keep_obj]
+        predicate_inds = predicate_inds.squeeze()[pred_list]
+        subject_inds = inds[sub_list]
+        object_inds = inds[obj_list]
+        pred_boxes = np.concatenate([pred_boxes,np.zeros([pred_boxes.shape[0],1])],axis=1)
+        for i, keep_idx in enumerate(keep):
+            pred_boxes[keep_idx] = bboxes_and_uniqueIDs[i]
+        subject_boxes = pred_boxes[sub_list]
+        object_boxes = pred_boxes[obj_list]
+        scores = scores[keep]
+        inds = inds[keep]
+        pred_boxes = bboxes_and_uniqueIDs
+
+        if clip:
+            # bbox is clipped to image boundaries
+            pred_boxes = clip_boxes(pred_boxes, im_info[0][:2] / im_info[0][2]) # [ num_keeped * 4 ]
+
+        # Filter out triplets whose predicate index is zero.
+        # Then select only top_N elements in descending order of score.
+        keep = np.where(predicate_inds > 0)
+        predicate_inds = predicate_inds[keep][:top_N]
+        triplet_scores = triplet_scores[keep][:top_N]
+        subject_inds = subject_inds[keep][:top_N]
+        object_inds = object_inds[keep][:top_N]
+        subject_boxes = subject_boxes[keep][:top_N]
+        object_boxes = object_boxes[keep][:top_N]
+
+        subject_IDs = subject_boxes[:,4][:top_N].astype(int)
+        object_IDs = object_boxes[:,4][:top_N].astype(int)
+
+
+
+        return pred_boxes, scores, inds, \
+               subject_inds, object_inds, \
+               subject_boxes, object_boxes, \
+               subject_IDs, object_IDs, \
+               predicate_inds, triplet_scores
+
+    def interpret_caption(self, region_caption, bbox_pred, region_rois, logprobs, im_info, clip=True, top_N=5):
+
+        boxes = region_rois.data.cpu().numpy()[:, 1:5] / im_info[0][2]
+        box_deltas = bbox_pred.data.cpu().numpy()
+        pred_boxes = bbox_transform_inv_hdn(boxes, box_deltas)
+        if clip:
+            pred_boxes = clip_boxes(pred_boxes, im_info[0][:2] / im_info[0][2])
+        probs = F.softmax(Variable(logprobs),dim=0).data.numpy()
+        sorted_list = probs.argsort()[::-1][:top_N]
+        region_caption = region_caption.numpy()[sorted_list]
+        probs = probs[sorted_list]
+        pred_boxes = pred_boxes[sorted_list]
+
+        # print 'im_scales[0]', im_scales[0]
+        return region_caption, probs, pred_boxes
+
+
+
+
+    def interpret_result(self, cls_prob, bbox_pred, rois, cls_prob_predicate,
                         mat_phrase, im_info, im_shape, nms=True, clip=True, min_score=0.01, 
                         use_gt_boxes=False):
         scores, inds = cls_prob[:, 0:].data.max(1)

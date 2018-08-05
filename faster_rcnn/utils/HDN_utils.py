@@ -125,7 +125,7 @@ def check_relationship_recall(gt_objects, gt_relationships,
 
     for idx, top_N in enumerate(top_Ns):
 
-        for gt_id in xrange(rel_cnt):
+        for gt_id in range(rel_cnt):
             fg_candidate = np.where(np.logical_and(
                 sub_overlaps[:top_N, gt_id] >= thres, 
                 obj_overlaps[:top_N, gt_id] >= thres))[0]

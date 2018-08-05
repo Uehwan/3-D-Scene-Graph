@@ -36,16 +36,16 @@ args = parser.parse_args()
 
 def main():
     global args
-    print "Loading training set and testing set..."
+    print("Loading training set and testing set...")
     train_set = visual_genome(args.dataset_option, 'train')
     test_set = visual_genome('small', 'test')
-    print "Done."
+    print("Done.")
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
     net = RPN(not args.use_normal_anchors)
     if args.resume_training:
-        print 'Resume training from: {}'.format(args.resume_model)
+        print('Resume training from: {}'.format(args.resume_model))
         if len(args.resume_model) == 0:
             raise Exception('[resume_model] not specified')
         network.load_net(args.resume_model, net)
@@ -53,7 +53,7 @@ def main():
                 {'params': list(net.parameters())[26:]}, 
                 ], lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
     else:
-        print 'Training from scratch...Initializing network...'
+        print('Training from scratch...Initializing network...')
         optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
 
     network.set_trainable(net.features, requires_grad=False)
@@ -157,7 +157,7 @@ def train(train_loader, target_net, optimizer, epoch):
 def test(test_loader, target_net):
     box_num = np.array([0, 0])
     correct_cnt, total_cnt = np.array([0, 0]), np.array([0, 0])
-    print '========== Testing ======='
+    print('========== Testing =======')
     target_net.eval()
 
     batch_time = network.AverageMeter()
@@ -184,7 +184,7 @@ def test(test_loader, target_net):
                     len(test_loader)))
 
     recall = correct_cnt / total_cnt.astype(np.float)
-    print '====== Done Testing ===='
+    print('====== Done Testing ====')
     return recall
 
 if __name__ == '__main__':
