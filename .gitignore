@@ -109,3 +109,6 @@ log/
 *.mat
 Debug_Code.ipynb
 eval/*.json
+
+pretrained_models/
+vis_result/
