@@ -54,7 +54,7 @@ parser.set_defaults(region_bbox_reg=True)
 parser.add_argument('--use_kernel_function', action='store_true')
 # Environment Settings
 parser.add_argument('--seed', type=int, default=1, help='set seed to some constant value to reproduce experiments')
-parser.add_argument('--saved_model_path', type=str, default = 'model/pretrained_models/VGG_imagenet.npy', help='The Model used for initialize')
+parser.add_argument('--saved_model_path', type=str, default = 'output/RPN/RPN_ful_region_resnet101_best.h5', help='The Model used for initialize')
 parser.add_argument('--dataset_option', type=str, default='small', help='The dataset to use (small | normal | fat)')
 parser.add_argument('--output_dir', type=str, default='./output/HDN', help='Location to output the model')
 parser.add_argument('--model_name', type=str, default='HDN', help='The name for saving model.')
@@ -65,6 +65,8 @@ parser.add_argument('--optimizer', type=int, default=0, help='which optimizer us
 
 parser.add_argument('--evaluate', action='store_true', help='Only use the testing mode')
 parser.add_argument('--only_predicate', action='store_true', help='evaluate only predicate')
+parser.add_argument('--cnn_type', type=str, default='resnet', help='vgg or resnet')
+parser.add_argument('--pooling_method', type=str, default='roi_crop', help='roi_pool, roi_align, or roi_crop')
 args = parser.parse_args()
 # Overall loss logger
 overall_train_loss = network.AverageMeter()
@@ -78,10 +80,10 @@ optimizer_select = 0
 def main():
     global args, optimizer_select
     # To set the model name automatically
-    print args
+    print(args)
     lr = args.lr
     args = get_model_name(args)
-    print 'Model name: {}'.format(args.model_name)
+    print('Model name: {}'.format(args.model_name))
 
     # To set the random seed
     random.seed(args.seed)
@@ -115,7 +117,9 @@ def main():
                  rnn_type=args.rnn_type,
                  rnn_droptout=args.caption_use_dropout, rnn_bias=args.caption_use_bias,
                  use_region_reg = args.region_bbox_reg,
-                 use_kernel = args.use_kernel_function)
+                 use_kernel = args.use_kernel_function,
+                 cnn_type=args.cnn_type,
+                 pooling_method=args.pooling_method)
 
     params = list(net.parameters())
     for param in params:
@@ -123,7 +127,7 @@ def main():
     print net
 
     # To group up the features
-    vgg_features_fix, vgg_features_var, rpn_features, hdn_features, language_features = group_features(net)
+    cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features = group_features(net)
 
     # Setting the state of the training model
     net.cuda()
@@ -135,6 +139,8 @@ def main():
 
 
     network.set_trainable(net, False)
+    state_dict=None
+    top_Ns = [50, 100]
     #  network.weights_normal_init(net, dev=0.01)
     if args.finetune_language_model:
         print 'Only finetuning the language model from: {}'.format(args.resume_model)
@@ -143,15 +149,16 @@ def main():
             raise Exception('[resume_model] not specified')
         network.load_net(args.resume_model, net)
         optimizer_select = 3
-
-
+        best_recall = np.zeros(len(top_Ns))
+        start_epoch = 0
     elif args.load_RPN:
         print 'Loading pretrained RPN: {}'.format(args.saved_model_path)
         args.train_all = False
         network.load_net(args.saved_model_path, net.rpn)
         net.reinitialize_fc_layers()
         optimizer_select = 1
-
+        start_epoch = 0
+        best_recall = np.zeros(len(top_Ns))
 
     elif args.resume_training:
         print 'Resume training from: {}'.format(args.resume_model)
@@ -159,25 +166,30 @@ def main():
             raise Exception('[resume_model] not specified')
         network.load_net(args.resume_model, net)
         args.train_all = True
+        checkpoint = torch.load(args.resume_model)
         optimizer_select = 2
-
+        start_epoch = checkpoint['epoch']+1
+        state_dict = checkpoint['state_dict']
+        recall = checkpoint['recall']
+        best_recall = checkpoint['best_recall']
     else:
         print 'Training from scratch.'
         net.rpn.initialize_parameters()
         net.reinitialize_fc_layers()
         optimizer_select = 0
         args.train_all = True
-
+        start_epoch =0
+        best_recall = np.zeros(len(top_Ns))
     optimizer = network.get_optimizer(lr,optimizer_select, args,
-                vgg_features_var, rpn_features, hdn_features, language_features)
+                cnn_features_var, rpn_features, hdn_features, language_features,state_dict)
 
     target_net = net
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
 
 
-    top_Ns = [50, 100]
-    best_recall = np.zeros(len(top_Ns))
+
+
 
 
     if args.evaluate:
@@ -189,42 +201,13 @@ def main():
 
         print('==============================')
     else:
-        for epoch in range(0, args.max_epoch):
+        for epoch in range(start_epoch, args.max_epoch):
             # Training
             train(train_loader, target_net, optimizer, epoch)
-            # snapshot the state
-            save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name, epoch))
-            network.save_net(save_name, net)
-            print('save model: {}'.format(save_name))
-
-
-
-
-
-
-
-
-
-
-
-
-
 
             # Testing
             # network.set_trainable(net, False) # Without backward(), requires_grad takes no effect
-
             recall = test(test_loader, net, top_Ns)
-
-            if np.all(recall > best_recall):
-                best_recall = recall
-                save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name))
-                network.save_net(save_name, net)
-                print('\nsave model: {}'.format(save_name))
-
-            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
-            for idx, top_N in enumerate(top_Ns):
-                print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
-                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100)),
 
             # updating learning policy
             if epoch % args.step_size == 0 and epoch > 0:
@@ -238,7 +221,36 @@ def main():
                     optimizer_select = 2
                 # update optimizer and correponding requires_grad state
                 optimizer = network.get_optimizer(lr, optimizer_select, args,
-                            vgg_features_var, rpn_features, hdn_features, language_features)
+                            cnn_features_var, rpn_features, hdn_features, language_features)
+
+            # snapshot the state
+            save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name,epoch))
+            network.save_net(save_name, net)
+            network.save_checkpoint({
+                'epoch': epoch,
+                'model': net.state_dict(),
+                'optimizer':optimizer.state_dict(),
+                'best_recall': best_recall,
+                'recall': recall,
+            }, save_name[:-2]+'pth')
+            print('save model: {}'.format(save_name))
+            if np.all(recall > best_recall):
+                best_recall = recall
+                save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name))
+                network.save_net(save_name, net)
+                network.save_checkpoint({
+                    'epoch': epoch,
+                    'model': net.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'best_recall': best_recall,
+                    'recall': recall,
+                }, save_name[:-2] + 'pth')
+                print('\nsave model: {}'.format(save_name))
+
+            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
+            for idx, top_N in enumerate(top_Ns):
+                print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
+                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100)),
 
 
 
@@ -337,11 +349,11 @@ def train(train_loader, target_net, optimizer, epoch):
                 print('\tregion_box_loss: %.4f, ' % (train_region_box_loss.avg)),
             print('\tregion_objectness_loss: %.4f' % (train_region_objectiveness_loss.avg)),
 
-            print('\n\t[object]\ttp: %.2f, \ttf: %.2f, \tfg/bg=(%d/%d)' %
+            print('\n\t[object]\ttp: %.2f, \ttn: %.2f, \tfg/bg=(%d/%d)' %
                   (accuracy_obj.ture_pos*100., accuracy_obj.true_neg*100., accuracy_obj.foreground, accuracy_obj.background))
-            print('\t[predicate]\ttp: %.2f, \ttf: %.2f, \tfg/bg=(%d/%d)' %
+            print('\t[predicate]\ttp: %.2f, \ttn: %.2f, \tfg/bg=(%d/%d)' %
                   (accuracy_pred.ture_pos*100., accuracy_pred.true_neg*100., accuracy_pred.foreground, accuracy_pred.background))
-            print('\t[region]\ttp: %.2f, \ttf: %.2f, \tfg/bg=(%d/%d)' %
+            print('\t[region]\ttp: %.2f, \ttn: %.2f, \tfg/bg=(%d/%d)' %
                   (accuracy_reg.ture_pos*100., accuracy_reg.true_neg*100., accuracy_reg.foreground, accuracy_reg.background))
 
             # logging to tensor board

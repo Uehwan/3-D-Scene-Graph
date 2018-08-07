@@ -11,13 +11,14 @@ from fast_rcnn.nms_wrapper import nms
 from rpn_msr.proposal_layer import proposal_layer as proposal_layer_py
 from rpn_msr.anchor_target_layer import anchor_target_layer as anchor_target_layer_py
 from fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
-
+from fast_rcnn.config import cfg
 
 import network
 from network import Conv2d, FC
 # from roi_pooling.modules.roi_pool_py import RoIPool
 from roi_pooling.modules.roi_pool import RoIPool
 #from vgg16 import VGG16
+from faster_rcnn.resnet import resnet101
 import torchvision.models as models
 import torch.utils.model_zoo as model_zoo
 import math
@@ -53,8 +54,36 @@ class RPN(nn.Module):
     anchor_scales_normal_region = [4, 8, 16, 32, 64]
     anchor_ratios_normal_region = [0.25, 0.5, 1, 2, 4]
 
-    def __init__(self, use_kmeans_anchors=False):
+    def __init__(self, use_kmeans_anchors=False,cnn_type='vgg',model_path='./pretrained_models/resnet101_caffe.pth'):
         super(RPN, self).__init__()
+
+        if cnn_type == 'vgg':
+            self.nConvChannel= 512
+            self.features = models.vgg16(pretrained=True).features
+            self.features.__delattr__('30') # to delete the max pooling
+            # by default, fix the first four layers
+            network.set_trainable_param(list(self.features.parameters())[:8], requires_grad=False)
+        elif cnn_type == 'resnet':
+            self.nConvChannel = 1024
+            resnet = resnet101()
+            print("Loading pretrained weights from %s" % (model_path))
+            state_dict = torch.load(model_path)
+            resnet.load_state_dict({k: v for k, v in state_dict.items() if k in resnet.state_dict()})
+            self.features = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu,
+                                           resnet.maxpool, resnet.layer1, resnet.layer2, resnet.layer3)
+            # Fix blocks
+            for p in self.features[0].parameters(): p.requires_grad = False
+            for p in self.features[1].parameters(): p.requires_grad = False
+            assert (0 <= cfg.RESNET.FIXED_BLOCKS < 4)
+            if cfg.RESNET.FIXED_BLOCKS >= 3:
+                for p in self.features[6].parameters(): p.requires_grad = False
+            if cfg.RESNET.FIXED_BLOCKS >= 2:
+                for p in self.features[5].parameters(): p.requires_grad = False
+            if cfg.RESNET.FIXED_BLOCKS >= 1:
+                for p in self.features[4].parameters(): p.requires_grad = False
+            #del resnet.layer4
+        else:
+            raise NotImplementedError
 
         if use_kmeans_anchors:
             print('using k-means anchors')
@@ -76,18 +105,15 @@ class RPN(nn.Module):
         self.anchor_num = len(self.anchor_scales)
         self.anchor_num_region = len(self.anchor_scales_region)
 
-        # self.features = VGG16(bn=False)
-        self.features = models.vgg16(pretrained=True).features
-        self.features.__delattr__('30') # to delete the max pooling
-        # by default, fix the first four layers
-        network.set_trainable_param(list(self.features.parameters())[:8], requires_grad=False) 
+
+
 
         # self.features = models.vgg16().features
-        self.conv1 = Conv2d(512, 512, 3, same_padding=True)
+        self.conv1 = Conv2d(self.nConvChannel, 512, 3, same_padding=True)
         self.score_conv = Conv2d(512, self.anchor_num * 2, 1, relu=False, same_padding=False)
         self.bbox_conv = Conv2d(512, self.anchor_num * 4, 1, relu=False, same_padding=False)
 
-        self.conv1_region = Conv2d(512, 512, 3, same_padding=True)
+        self.conv1_region = Conv2d(self.nConvChannel, 512, 3, same_padding=True)
         self.score_conv_region = Conv2d(512, self.anchor_num_region * 2, 1, relu=False, same_padding=False)
         self.bbox_conv_region = Conv2d(512, self.anchor_num_region * 4, 1, relu=False, same_padding=False)
 

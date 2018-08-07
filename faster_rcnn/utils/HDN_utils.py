@@ -69,6 +69,8 @@ def get_model_name(arguments):
         arguments.solver = 'Adagrad'
     else:
         raise Exception('Unrecognized optimization algorithm specified!')
+    arguments.model_name += '_'+arguments.cnn_type
+    arguments.model_name += '_'+arguments.pooling_method
 
     return arguments
 

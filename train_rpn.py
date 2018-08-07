@@ -26,12 +26,13 @@ parser.add_argument('--use_normal_anchors', action='store_true', help='Whether t
 parser.add_argument('--step_size', type=int, default=2, help='step to decay the learning rate')
 
 ## Environment Settings
+parser.add_argument('--cnn_type', type=str, default ='resnet', help='vgg or resnet')
 parser.add_argument('--pretrained_model', type=str, default='model/pretrained_models/VGG_imagenet.npy', help='Path for the to-evaluate model')
 parser.add_argument('--dataset_option', type=str, default='small', help='The dataset to use (small | normal | fat)')
 parser.add_argument('--output_dir', type=str, default='./output/RPN', help='Location to output the model')
 parser.add_argument('--model_name', type=str, default='RPN_region', help='model name for snapshot')
 parser.add_argument('--resume_training', action='store_true', help='Resume training from the model [resume_model]')
-parser.add_argument('--resume_model', type=str, default='', help='The model we resume')
+parser.add_argument('--resume_model', type=str, default='./output/trained_model/RPN_region_full_best.h5', help='The model we resume')
 args = parser.parse_args()
 
 def main():
@@ -43,20 +44,47 @@ def main():
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
-    net = RPN(not args.use_normal_anchors)
+    net = RPN(not args.use_normal_anchors,cnn_type=args.cnn_type)
+    if args.cnn_type=='vgg':
+        optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
+    elif args.cnn_type=='resnet':
+        optimizer = torch.optim.SGD(list(net.features.parameters())[72:]+
+                                    list(net.conv1.parameters())+
+                                    list(net.score_conv.parameters())+
+                                    list(net.bbox_conv.parameters())+
+                                    list(net.conv1_region.parameters()) +
+                                    list(net.score_conv_region.parameters()) +
+                                    list(net.bbox_conv_region.parameters())
+                                    , lr=args.lr, momentum=args.momentum,
+                                    weight_decay=0.0005)
+    else:
+        raise NotImplementedError
+
     if args.resume_training:
         print('Resume training from: {}'.format(args.resume_model))
         if len(args.resume_model) == 0:
             raise Exception('[resume_model] not specified')
         network.load_net(args.resume_model, net)
-        optimizer = torch.optim.SGD([
-                {'params': list(net.parameters())[26:]}, 
-                ], lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
-    else:
-        print('Training from scratch...Initializing network...')
-        optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
+        checkpoint = torch.load(args.resume_model)
+        start_epoch = checkpoint['epoch']+1
+        state_dict = checkpoint['state_dict']
+        optimizer.load_state_dict(state_dict)
+        net.cuda()
+        # Testing
+        recall = test(test_loader, net)
+        print('Epoch[{epoch:d}]: '
+              'Recall: '
+              'object: {recall[0]: .3f}%% (Best: {best_recall[0]: .3f}%%)'
+              'region: {recall[1]: .3f}%% (Best: {best_recall[1]: .3f}%%)'.format(
+                epoch = 0, recall=recall * 100, best_recall=[0,0] * 100))
 
-    network.set_trainable(net.features, requires_grad=False)
+    else:
+        start_epoch = 0
+        print('Training from scratch...Initializing network...')
+
+
+
+    #network.set_trainable(net.features, requires_grad=False)
     net.cuda()
 
     if not os.path.exists(args.output_dir):
@@ -64,7 +92,7 @@ def main():
 
     best_recall = np.array([0.0, 0.0])
     
-    for epoch in range(0, args.max_epoch):
+    for epoch in range(start_epoch, args.max_epoch):
         
         # Training
         train(train_loader, net, optimizer, epoch)
@@ -85,14 +113,25 @@ def main():
 
         save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name, epoch))
         network.save_net(save_name, net)
+        network.save_checkpoint({
+            'epoch': epoch,
+            'model': net.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'best_recall': best_recall,
+            'recall': recall,
+        }, save_name[:-2] + 'pth')
         print('save model: {}'.format(save_name))
 
         if np.all(recall > best_recall):
             best_recall = recall
             save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name, epoch))
             network.save_net(save_name, net)
+            network.save_checkpoint({
+                'epoch': epoch,
+                'model': net.state_dict(),
+                'optimizer': optimizer.state_dict(),
+            }, save_name[:-2] + 'pth')
 
-        
 
 
 def train(train_loader, target_net, optimizer, epoch):

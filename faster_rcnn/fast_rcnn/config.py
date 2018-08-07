@@ -308,9 +308,32 @@ __C.USE_GPU_NMS = True
 # Default GPU device id
 __C.GPU_ID = 0
 
+__C.POOLING_MODE = 'crop'
+
+# Size of the pooled region after RoI pooling
+__C.POOLING_SIZE = 7
+
+__C.CROP_RESIZE_WITH_MAX_POOL = True
 
 __C.EVALUATE = edict()
 __C.EVALUATE.BBOX_THRESH = 0.5
+
+#
+# ResNet options
+#
+
+__C.RESNET = edict()
+
+# Option to set if max-pooling is appended after crop_and_resize.
+# if true, the region will be resized to a square of 2xPOOLING_SIZE,
+# then 2x2 max-pooling is applied; otherwise the region will be directly
+# resized to a square of POOLING_SIZE
+__C.RESNET.MAX_POOL = False
+
+# Number of fixed blocks during training, by default the first of all 4 blocks is fixed
+# Range: 0 (none) to 3 (all)
+__C.RESNET.FIXED_BLOCKS = 2
+__C.USE_CONV = True
 
 
 def get_output_dir(imdb, weights_filename):

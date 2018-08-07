@@ -29,7 +29,8 @@ args.caption_use_bias = True
 args.caption_use_dropout = True
 args.rnn_type = 'LSTM_normal'
 args.evaluate = True
-
+args.cnn_type = 'resnet'
+args.pooling_method = 'roi_crop'
 # To set the model name automatically
 print(args)
 lr = args.lr

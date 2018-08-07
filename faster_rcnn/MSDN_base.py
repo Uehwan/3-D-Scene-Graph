@@ -49,7 +49,7 @@ class HDN_base(nn.Module):
                  use_kmeans_anchors, 
                  nhidden_caption, 
                  nembedding,
-                 rnn_type, use_region_reg=False):
+                 rnn_type, use_region_reg=False, cnn_type='resnet'):
 
         super(HDN_base, self).__init__()
         assert n_object_cats is not None and n_predicate_cats is not None
@@ -57,7 +57,7 @@ class HDN_base(nn.Module):
             nembedding = nhidden
         if MPS_iter < 0:
             print 'Use random interation from 1 to 5'
-
+        self.cnn_type = cnn_type
         self.n_classes_obj = n_object_cats
         self.n_classes_pred = n_predicate_cats
         self.max_word_length = max_word_length
@@ -85,24 +85,32 @@ class HDN_base(nn.Module):
 
     def reinitialize_fc_layers(self):
 
-        print 'Reinitialize the fc layers...',
+        print('Reinitialize the fc layers...')
         weight_multiplier = 4096. / self.nhidden
         vgg16 = models.vgg16(pretrained=True)
-        self.fc6_obj.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
-        self.fc6_obj.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
-        self.fc6_phrase.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
-        self.fc6_phrase.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
-        self.fc6_region.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
-        self.fc6_region.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
+        if self.cnn_type == 'vgg':
+            #print(self.fc6_obj.fc.weight.data.shape)
+            #print(vgg16.classifier[0].weight.data.shape)
+            self.fc6_obj.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
+            self.fc6_obj.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
+            self.fc6_phrase.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
+            self.fc6_phrase.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
+            self.fc6_region.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
+            self.fc6_region.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
 
-        self.fc7_obj.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
-        self.fc7_obj.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
-        self.fc7_phrase.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
-        self.fc7_phrase.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
-        self.fc7_region.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
-        self.fc7_region.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
+            self.fc7_obj.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
+            self.fc7_obj.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
+            self.fc7_phrase.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
+            self.fc7_phrase.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
+            self.fc7_region.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
+            self.fc7_region.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
+        elif self.cnn_type == 'resnet':
+            print('Initializing fc layers for resnet has not been implemented yet')
+        else:
+            raise NotImplementedError
+
         # network.weights_normal_init(self.caption_prediction, 0.01)
-        print 'Done.'
+        print('Done.')
 
 
     @property
