@@ -22,6 +22,7 @@ from faster_rcnn.resnet import resnet101
 import torchvision.models as models
 import torch.utils.model_zoo as model_zoo
 import math
+import pretrainedmodels
 
 DEBUG = False
 
@@ -82,6 +83,14 @@ class RPN(nn.Module):
             if cfg.RESNET.FIXED_BLOCKS >= 1:
                 for p in self.features[4].parameters(): p.requires_grad = False
             #del resnet.layer4
+        elif cnn_type == 'senet':
+            self.nConvChannel = 1024
+            senet = pretrainedmodels.senet154(1000)
+            senet = nn.Sequential(*list(senet.children())[:-4])
+            self.features = senet
+            for i in range(len(self.features)-1):
+                for p in self.features[i].parameters(): p.requires_grad = False
+
         else:
             raise NotImplementedError
 

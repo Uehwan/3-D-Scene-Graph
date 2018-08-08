@@ -4,6 +4,7 @@ from torch.autograd import Variable
 import numpy as np
 import math
 import pdb
+import os
 
 class Conv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, relu=True, same_padding=False, bn=False):
@@ -43,8 +44,30 @@ def save_net(fname, net):
         #print '[Saved]: {}'.format(k)
 
 
-def save_checkpoint(state, filename):
-    torch.save(state, filename)
+def save_checkpoint(args,net,optimizer,best_recall,recall,epoch):
+    # snapshot the state
+    save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name, epoch))
+    save_net(save_name, net)
+    torch.save({
+        'epoch': epoch,
+        'model': net.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'best_recall': best_recall,
+        'recall': recall,
+    }, save_name[:-2] + 'pth')
+    print('save model: {}'.format(save_name))
+    if np.all(recall > best_recall):
+        best_recall = recall
+        save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name))
+        save_net(save_name, net)
+        torch.save({
+            'epoch': epoch,
+            'model': net.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'best_recall': best_recall,
+            'recall': recall,
+        }, save_name[:-2] + 'pth')
+        print('\nsave model: {}'.format(save_name))
 
 def load_net(fname, net):
     import h5py
@@ -61,6 +84,31 @@ def load_net(fname, net):
         pdb.set_trace()
         print '[Loaded net not complete] Parameter[{}] Size Mismatch...'.format(k)
         
+def load_checkpoint(fname, net, optimizer=None,method='h5'):
+    checkpoint = torch.load(fname[:-2] + 'pth',
+                            map_location=lambda storage, loc: storage)
+    model = checkpoint['model']
+    start_epoch = checkpoint['epoch'] + 1
+    optim_dict = checkpoint['optimizer']
+    best_recall = checkpoint['best_recall']
+    recall = checkpoint['recall']
+
+    if method=='h5':
+        load_net(fname,net)
+    else:
+        net.load_state_dict(model)
+    net.cuda()
+
+    if optimizer:
+        optimizer.load_state_dict(optim_dict)
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if torch.is_tensor(v):
+                    state[k] = v.cuda()
+        return net, optimizer, start_epoch, best_recall, recall
+
+    return net, optim_dict, start_epoch, best_recall, recall
+
 
 
 def np_to_variable(x, is_cuda=True, dtype=torch.FloatTensor):
@@ -245,6 +293,10 @@ def get_optimizer(lr, mode, args, cnn_features_var, rpn_features, hdn_features, 
 
     if state_dict:
         optimizer.load_state_dict(state_dict)
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if torch.is_tensor(v):
+                    state[k] = v.cuda()
 
     return optimizer
 

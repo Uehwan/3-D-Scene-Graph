@@ -86,11 +86,12 @@ class HDN_base(nn.Module):
     def reinitialize_fc_layers(self):
 
         print('Reinitialize the fc layers...')
-        weight_multiplier = 4096. / self.nhidden
-        vgg16 = models.vgg16(pretrained=True)
+
         if self.cnn_type == 'vgg':
             #print(self.fc6_obj.fc.weight.data.shape)
             #print(vgg16.classifier[0].weight.data.shape)
+            weight_multiplier = 4096. / self.nhidden
+            vgg16 = models.vgg16(pretrained=True)
             self.fc6_obj.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)
             self.fc6_obj.fc.bias.data.copy_(vgg16.classifier[0].bias.data[:self.nhidden] * weight_multiplier)
             self.fc6_phrase.fc.weight.data.copy_(vgg16.classifier[0].weight.data[:self.nhidden] * weight_multiplier)

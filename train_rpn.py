@@ -6,13 +6,15 @@ from faster_rcnn import network
 from faster_rcnn.RPN import RPN # Hierarchical_Descriptive_Model
 from faster_rcnn.utils.timer import Timer
 from faster_rcnn.utils.HDN_utils import check_recall
-
 from faster_rcnn.datasets.visual_genome_loader import visual_genome
 from faster_rcnn.fast_rcnn.config import cfg
 import argparse
-
 import pdb
-
+'''Training command example'''
+# Train from scratch
+# CUDA_VISIBLE_DEVICES=0 python train_rpn.py --max_epoch=10 --step_size=2 --dataset_option=normal --model_name=RPN_full_region_resnet101
+# Resume training
+# CUDA_VISIBLE_DEVICES=0 python train_rpn.py --max_epoch=10 --step_size=2 --dataset_option=normal --model_name=RPN_full_region_resnet101 --resume_training --resume_model ./output/RPN/RPN_full_region_resnet101_best.h5
 
 parser = argparse.ArgumentParser('Options for training RPN in pytorch')
 
@@ -26,7 +28,7 @@ parser.add_argument('--use_normal_anchors', action='store_true', help='Whether t
 parser.add_argument('--step_size', type=int, default=2, help='step to decay the learning rate')
 
 ## Environment Settings
-parser.add_argument('--cnn_type', type=str, default ='resnet', help='vgg or resnet')
+parser.add_argument('--cnn_type', type=str, default ='resnet', help='vgg, resnet, senet')
 parser.add_argument('--pretrained_model', type=str, default='model/pretrained_models/VGG_imagenet.npy', help='Path for the to-evaluate model')
 parser.add_argument('--dataset_option', type=str, default='small', help='The dataset to use (small | normal | fat)')
 parser.add_argument('--output_dir', type=str, default='./output/RPN', help='Location to output the model')
@@ -34,104 +36,6 @@ parser.add_argument('--model_name', type=str, default='RPN_region', help='model 
 parser.add_argument('--resume_training', action='store_true', help='Resume training from the model [resume_model]')
 parser.add_argument('--resume_model', type=str, default='./output/trained_model/RPN_region_full_best.h5', help='The model we resume')
 args = parser.parse_args()
-
-def main():
-    global args
-    print("Loading training set and testing set...")
-    train_set = visual_genome(args.dataset_option, 'train')
-    test_set = visual_genome('small', 'test')
-    print("Done.")
-
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
-    net = RPN(not args.use_normal_anchors,cnn_type=args.cnn_type)
-    if args.cnn_type=='vgg':
-        optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
-    elif args.cnn_type=='resnet':
-        optimizer = torch.optim.SGD(list(net.features.parameters())[72:]+
-                                    list(net.conv1.parameters())+
-                                    list(net.score_conv.parameters())+
-                                    list(net.bbox_conv.parameters())+
-                                    list(net.conv1_region.parameters()) +
-                                    list(net.score_conv_region.parameters()) +
-                                    list(net.bbox_conv_region.parameters())
-                                    , lr=args.lr, momentum=args.momentum,
-                                    weight_decay=0.0005)
-    else:
-        raise NotImplementedError
-
-    if args.resume_training:
-        print('Resume training from: {}'.format(args.resume_model))
-        if len(args.resume_model) == 0:
-            raise Exception('[resume_model] not specified')
-        network.load_net(args.resume_model, net)
-        checkpoint = torch.load(args.resume_model)
-        start_epoch = checkpoint['epoch']+1
-        state_dict = checkpoint['state_dict']
-        optimizer.load_state_dict(state_dict)
-        net.cuda()
-        # Testing
-        recall = test(test_loader, net)
-        print('Epoch[{epoch:d}]: '
-              'Recall: '
-              'object: {recall[0]: .3f}%% (Best: {best_recall[0]: .3f}%%)'
-              'region: {recall[1]: .3f}%% (Best: {best_recall[1]: .3f}%%)'.format(
-                epoch = 0, recall=recall * 100, best_recall=[0,0] * 100))
-
-    else:
-        start_epoch = 0
-        print('Training from scratch...Initializing network...')
-
-
-
-    #network.set_trainable(net.features, requires_grad=False)
-    net.cuda()
-
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
-
-    best_recall = np.array([0.0, 0.0])
-    
-    for epoch in range(start_epoch, args.max_epoch):
-        
-        # Training
-        train(train_loader, net, optimizer, epoch)
-
-        # Testing
-        recall = test(test_loader, net)
-        print('Epoch[{epoch:d}]: '
-              'Recall: '
-              'object: {recall[0]: .3f}%% (Best: {best_recall[0]: .3f}%%)'
-              'region: {recall[1]: .3f}%% (Best: {best_recall[1]: .3f}%%)'.format(
-                epoch = epoch, recall=recall * 100, best_recall=best_recall * 100))
-        # update learning rate
-        if epoch % args.step_size == 0:
-            args.disable_clip_gradient = True
-            args.lr /= 10
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = args.lr
-
-        save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name, epoch))
-        network.save_net(save_name, net)
-        network.save_checkpoint({
-            'epoch': epoch,
-            'model': net.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'best_recall': best_recall,
-            'recall': recall,
-        }, save_name[:-2] + 'pth')
-        print('save model: {}'.format(save_name))
-
-        if np.all(recall > best_recall):
-            best_recall = recall
-            save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name, epoch))
-            network.save_net(save_name, net)
-            network.save_checkpoint({
-                'epoch': epoch,
-                'model': net.state_dict(),
-                'optimizer': optimizer.state_dict(),
-            }, save_name[:-2] + 'pth')
-
 
 
 def train(train_loader, target_net, optimizer, epoch):
@@ -191,8 +95,6 @@ def train(train_loader, target_net, optimizer, epoch):
                    cls_loss_object=train_loss_obj_entropy, reg_loss_object=train_loss_obj_box, 
                    cls_loss_region=train_loss_reg_entropy, reg_loss_region=train_loss_reg_box))
 
-
-
 def test(test_loader, target_net):
     box_num = np.array([0, 0])
     correct_cnt, total_cnt = np.array([0, 0]), np.array([0, 0])
@@ -227,4 +129,123 @@ def test(test_loader, target_net):
     return recall
 
 if __name__ == '__main__':
-    main()
+    global args
+    print("Loading training set and testing set...")
+    train_set = visual_genome(args.dataset_option, 'train')
+    test_set = visual_genome('small', 'test')
+    print("Done.")
+
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
+    net = RPN(not args.use_normal_anchors, cnn_type=args.cnn_type)
+    if args.cnn_type == 'vgg':
+        optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum,
+                                    weight_decay=0.0005)
+    elif args.cnn_type == 'resnet':
+        optimizer = torch.optim.SGD(list(net.features.parameters())[72:] +
+                                    list(net.conv1.parameters()) +
+                                    list(net.score_conv.parameters()) +
+                                    list(net.bbox_conv.parameters()) +
+                                    list(net.conv1_region.parameters()) +
+                                    list(net.score_conv_region.parameters()) +
+                                    list(net.bbox_conv_region.parameters())
+                                    , lr=args.lr, momentum=args.momentum,
+                                    weight_decay=0.0005)
+    elif args.cnn_type == 'senet':
+        optimizer = torch.optim.SGD(list(net.features[-1].parameters()) +
+                                    list(net.conv1.parameters()) +
+                                    list(net.score_conv.parameters()) +
+                                    list(net.bbox_conv.parameters()) +
+                                    list(net.conv1_region.parameters()) +
+                                    list(net.score_conv_region.parameters()) +
+                                    list(net.bbox_conv_region.parameters())
+                                    , lr=args.lr, momentum=args.momentum,
+                                    weight_decay=0.0005)
+    else:
+        raise NotImplementedError
+
+    if args.resume_training:
+        print('Resume training from: {}'.format(args.resume_model))
+        if len(args.resume_model) == 0:
+            raise Exception('[resume_model] not specified')
+        net, optimizer, start_epoch, best_recall, recall \
+            = network.load_checkpoint(args.resume_model,net,optimizer,method='h5')
+
+        # network.load_net(args.resume_model, net)
+        # checkpoint = torch.load(args.resume_model[:-2] + 'pth',
+        #                         map_location=lambda storage, loc: storage)
+        # # net.load_state_dict(checkpoint['model'])
+        # start_epoch = checkpoint['epoch'] + 1
+        # optim_dict = checkpoint['optimizer']
+        # best_recall = checkpoint['best_recall']
+        # optimizer.load_state_dict(optim_dict)
+        # for state in optimizer.state.values():
+        #     for k, v in state.items():
+        #         if torch.is_tensor(v):
+        #             state[k] = v.cuda()
+        # net.cuda()
+
+        '''
+        # Testing
+        recall = test(test_loader, net)
+
+        print('Epoch[{epoch:d}]: '
+              'Recall: '
+              'object: {recall[0]: .3f}%% (Best: {best_recall[0]: .3f}%%)'
+              'region: {recall[1]: .3f}%% (Best: {best_recall[1]: .3f}%%)'.format(
+                epoch = checkpoint['epoch'], recall=recall * 100, best_recall=best_recall * 100))
+        '''
+    else:
+        start_epoch = 0
+        best_recall = np.array([0.0, 0.0])
+        net.cuda()
+        print('Training from scratch...Initializing network...')
+
+    # network.set_trainable(net.features, requires_grad=False)
+    if not os.path.exists('./output'):
+        os.mkdir('./output')
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+
+    for epoch in range(start_epoch, args.max_epoch):
+
+        # Training
+        train(train_loader, net, optimizer, epoch)
+
+        # Testing
+        recall = test(test_loader, net)
+        print('Epoch[{epoch:d}]: '
+              'Recall: '
+              'object: {recall[0]: .3f}%% (Best: {best_recall[0]: .3f}%%)'
+              'region: {recall[1]: .3f}%% (Best: {best_recall[1]: .3f}%%)'.format(
+            epoch=epoch, recall=recall * 100, best_recall=best_recall * 100))
+        # update learning rate
+        if epoch % args.step_size == 0:
+            args.disable_clip_gradient = True
+            args.lr /= 10
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = args.lr
+
+        # snapshot the state
+        network.save_checkpoint(args, net, optimizer, best_recall, recall, epoch)
+
+
+        # save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name, epoch))
+        # network.save_net(save_name, net)
+        # network.save_checkpoint({
+        #     'epoch': epoch,
+        #     'model': net.state_dict(),
+        #     'optimizer': optimizer.state_dict(),
+        #     'best_recall': best_recall,
+        #     'recall': recall,
+        # }, save_name[:-2] + 'pth')
+        # if np.all(recall > best_recall):
+        #     best_recall = recall
+        #     save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name, epoch))
+        #     network.save_net(save_name, net)
+        #     network.save_checkpoint({
+        #         'epoch': epoch,
+        #         'model': net.state_dict(),
+        #         'optimizer': optimizer.state_dict(),
+        #     }, save_name[:-2] + 'pth')
+        # print('save model: {}'.format(save_name))

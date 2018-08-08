@@ -5,21 +5,21 @@ import random
 import numpy as np
 import numpy.random as npr
 import argparse
-
-
 import torch
-
 from faster_rcnn import network
 from faster_rcnn.MSDN import Hierarchical_Descriptive_Model
 from faster_rcnn.utils.timer import Timer
 from faster_rcnn.fast_rcnn.config import cfg
 from faster_rcnn.datasets.visual_genome_loader import visual_genome
 from faster_rcnn.utils.HDN_utils import get_model_name, group_features
-
 import pdb
-
 # To log the training process
 from tensorboard_logger import configure, log_value
+'''Training command example'''
+# Train from scratch
+# CUDA_VISIBLE_DEVICES=0 python train_hdn.py --load_RPN --saved_model_path=./output/RPN/RPN_full__region_resnet101_best.h5  --dataset_option=normal --enable_clip_gradient --step_size=2 --MPS_iter=1 --caption_use_bias --caption_use_dropout --rnn_type LSTM_normal --cnn_type resnet --pooling_method roi_align
+# Resume training
+# CUDA_VISIBLE_DEVICES=1 python train_hdn.py --resume_training --resume_model ./output/HDN/HDN_1_iters_alt_normal_I_LSTM_with_bias_with_dropout_0_5_nembed_256_nhidden_512_with_region_regression_SGD_resnet_roi_align_epoch_0.h5 --dataset_option=normal --enable_clip_gradient --step_size=2 --MPS_iter=1 --caption_use_bias --caption_use_dropout --rnn_type LSTM_normal --cnn_type resnet --pooling_method roi_align
 
 TIME_IT = cfg.TIME_IT
 parser = argparse.ArgumentParser('Options for training Hierarchical Descriptive Model in pytorch')
@@ -74,187 +74,6 @@ overall_train_rpn_loss = network.AverageMeter()
 overall_train_region_caption_loss = network.AverageMeter()
 
 optimizer_select = 0
-
-
-
-def main():
-    global args, optimizer_select
-    # To set the model name automatically
-    print(args)
-    lr = args.lr
-    args = get_model_name(args)
-    print('Model name: {}'.format(args.model_name))
-
-    # To set the random seed
-    random.seed(args.seed)
-    torch.manual_seed(args.seed + 1)
-    torch.cuda.manual_seed(args.seed + 2)
-
-    print("Loading training set and testing set..."),
-    train_set = visual_genome(args.dataset_option, 'train')
-    test_set = visual_genome('small', 'test')
-    print("Done.")
-
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
-
-    # Model declaration
-    net = Hierarchical_Descriptive_Model(nhidden=args.mps_feature_len,
-                 n_object_cats=train_set.num_object_classes,
-                 n_predicate_cats=train_set.num_predicate_classes,
-                 n_vocab=train_set.voc_size,
-                 voc_sign=train_set.voc_sign,
-                 max_word_length=train_set.max_size,
-                 MPS_iter=args.MPS_iter,
-                 use_language_loss=not args.disable_language_model,
-                 object_loss_weight=train_set.inverse_weight_object,
-                 predicate_loss_weight=train_set.inverse_weight_predicate,
-                 dropout=args.dropout,
-                 use_kmeans_anchors=not args.use_normal_anchors,
-                 gate_width = args.gate_width,
-                 nhidden_caption = args.nhidden_caption,
-                 nembedding = args.nembedding,
-                 rnn_type=args.rnn_type,
-                 rnn_droptout=args.caption_use_dropout, rnn_bias=args.caption_use_bias,
-                 use_region_reg = args.region_bbox_reg,
-                 use_kernel = args.use_kernel_function,
-                 cnn_type=args.cnn_type,
-                 pooling_method=args.pooling_method)
-
-    params = list(net.parameters())
-    for param in params:
-        print param.size()
-    print net
-
-    # To group up the features
-    cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features = group_features(net)
-
-    # Setting the state of the training model
-    net.cuda()
-    net.train()
-    logger_path = "log/logger/{}".format(args.model_name)
-    if os.path.exists(logger_path):
-        shutil.rmtree(logger_path)
-    configure(logger_path, flush_secs=5) # setting up the logger
-
-
-    network.set_trainable(net, False)
-    state_dict=None
-    top_Ns = [50, 100]
-    #  network.weights_normal_init(net, dev=0.01)
-    if args.finetune_language_model:
-        print 'Only finetuning the language model from: {}'.format(args.resume_model)
-        args.train_all = False
-        if len(args.resume_model) == 0:
-            raise Exception('[resume_model] not specified')
-        network.load_net(args.resume_model, net)
-        optimizer_select = 3
-        best_recall = np.zeros(len(top_Ns))
-        start_epoch = 0
-    elif args.load_RPN:
-        print 'Loading pretrained RPN: {}'.format(args.saved_model_path)
-        args.train_all = False
-        network.load_net(args.saved_model_path, net.rpn)
-        net.reinitialize_fc_layers()
-        optimizer_select = 1
-        start_epoch = 0
-        best_recall = np.zeros(len(top_Ns))
-
-    elif args.resume_training:
-        print 'Resume training from: {}'.format(args.resume_model)
-        if len(args.resume_model) == 0:
-            raise Exception('[resume_model] not specified')
-        network.load_net(args.resume_model, net)
-        args.train_all = True
-        checkpoint = torch.load(args.resume_model)
-        optimizer_select = 2
-        start_epoch = checkpoint['epoch']+1
-        state_dict = checkpoint['state_dict']
-        recall = checkpoint['recall']
-        best_recall = checkpoint['best_recall']
-    else:
-        print 'Training from scratch.'
-        net.rpn.initialize_parameters()
-        net.reinitialize_fc_layers()
-        optimizer_select = 0
-        args.train_all = True
-        start_epoch =0
-        best_recall = np.zeros(len(top_Ns))
-    optimizer = network.get_optimizer(lr,optimizer_select, args,
-                cnn_features_var, rpn_features, hdn_features, language_features,state_dict)
-
-    target_net = net
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
-
-
-
-
-
-
-    if args.evaluate:
-        recall = test(test_loader, net, top_Ns)
-        print('======= Testing Result =======')
-        for idx, top_N in enumerate(top_Ns):
-            print('[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
-                top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
-
-        print('==============================')
-    else:
-        for epoch in range(start_epoch, args.max_epoch):
-            # Training
-            train(train_loader, target_net, optimizer, epoch)
-
-            # Testing
-            # network.set_trainable(net, False) # Without backward(), requires_grad takes no effect
-            recall = test(test_loader, net, top_Ns)
-
-            # updating learning policy
-            if epoch % args.step_size == 0 and epoch > 0:
-                lr /= 10
-                args.lr = lr
-                print '[learning rate: {}]'.format(lr)
-
-                args.enable_clip_gradient = False
-                if not args.finetune_language_model:
-                    args.train_all = True
-                    optimizer_select = 2
-                # update optimizer and correponding requires_grad state
-                optimizer = network.get_optimizer(lr, optimizer_select, args,
-                            cnn_features_var, rpn_features, hdn_features, language_features)
-
-            # snapshot the state
-            save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name,epoch))
-            network.save_net(save_name, net)
-            network.save_checkpoint({
-                'epoch': epoch,
-                'model': net.state_dict(),
-                'optimizer':optimizer.state_dict(),
-                'best_recall': best_recall,
-                'recall': recall,
-            }, save_name[:-2]+'pth')
-            print('save model: {}'.format(save_name))
-            if np.all(recall > best_recall):
-                best_recall = recall
-                save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name))
-                network.save_net(save_name, net)
-                network.save_checkpoint({
-                    'epoch': epoch,
-                    'model': net.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'best_recall': best_recall,
-                    'recall': recall,
-                }, save_name[:-2] + 'pth')
-                print('\nsave model: {}'.format(save_name))
-
-            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
-            for idx, top_N in enumerate(top_Ns):
-                print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
-                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100)),
-
-
-
-
 
 def train(train_loader, target_net, optimizer, epoch):
     global args
@@ -361,16 +180,11 @@ def train(train_loader, target_net, optimizer, epoch):
             log_value('RPN_loss loss', overall_train_rpn_loss.avg, overall_train_rpn_loss.count)
             log_value('caption loss', overall_train_region_caption_loss.avg, overall_train_region_caption_loss.count)
 
-
-
-
-
-
 def test(test_loader, net, top_Ns):
 
     global args
 
-    print '========== Testing ======='
+    print('========== Testing =======')
     net.eval()
     # For efficiency inference
     languge_state = net.use_language_loss
@@ -395,11 +209,11 @@ def test(test_loader, net, top_Ns):
         end = time.time()
         if (i + 1) % 500 == 0 and i > 0:
             for idx, top_N in enumerate(top_Ns):
-                print '[%d/%d][Evaluation] Top-%d Recall: %2.3f%%' % (
-                    i+1, len(test_loader), top_N, rel_cnt_correct[idx] / float(rel_cnt) * 100)
+                print('[%d/%d][Evaluation] Top-%d Recall: %2.3f%%' % (
+                    i+1, len(test_loader), top_N, rel_cnt_correct[idx] / float(rel_cnt) * 100))
 
     recall = rel_cnt_correct / rel_cnt
-    print '====== Done Testing ===='
+    print('====== Done Testing ====')
     # Restore the related states
     net.use_language_loss = languge_state
     net.use_region_reg = region_reg_state
@@ -408,4 +222,184 @@ def test(test_loader, net, top_Ns):
 
 
 if __name__ == '__main__':
-    main()
+    global args, optimizer_select
+    # To set the model name automatically
+    print(args)
+    lr = args.lr
+    args = get_model_name(args)
+    print('Model name: {}'.format(args.model_name))
+
+    # To set the random seed
+    random.seed(args.seed)
+    torch.manual_seed(args.seed + 1)
+    torch.cuda.manual_seed(args.seed + 2)
+
+    print("Loading training set and testing set..."),
+    train_set = visual_genome(args.dataset_option, 'train')
+    test_set = visual_genome('small', 'test')
+    print("Done.")
+
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
+
+    # Model declaration
+    net = Hierarchical_Descriptive_Model(nhidden=args.mps_feature_len,
+                 n_object_cats=train_set.num_object_classes,
+                 n_predicate_cats=train_set.num_predicate_classes,
+                 n_vocab=train_set.voc_size,
+                 voc_sign=train_set.voc_sign,
+                 max_word_length=train_set.max_size,
+                 MPS_iter=args.MPS_iter,
+                 use_language_loss=not args.disable_language_model,
+                 object_loss_weight=train_set.inverse_weight_object,
+                 predicate_loss_weight=train_set.inverse_weight_predicate,
+                 dropout=args.dropout,
+                 use_kmeans_anchors=not args.use_normal_anchors,
+                 gate_width = args.gate_width,
+                 nhidden_caption = args.nhidden_caption,
+                 nembedding = args.nembedding,
+                 rnn_type=args.rnn_type,
+                 rnn_droptout=args.caption_use_dropout, rnn_bias=args.caption_use_bias,
+                 use_region_reg = args.region_bbox_reg,
+                 use_kernel = args.use_kernel_function,
+                 cnn_type=args.cnn_type,
+                 pooling_method=args.pooling_method)
+
+    params = list(net.parameters())
+    for param in params:
+        print(param.size())
+    print(net)
+
+    # To group up the features
+    cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features = group_features(net)
+
+    # Setting the state of the training model
+    net.cuda()
+    net.train()
+    logger_path = "log/logger/{}".format(args.model_name)
+    if os.path.exists(logger_path):
+        shutil.rmtree(logger_path)
+    configure(logger_path, flush_secs=5) # setting up the logger
+
+
+    network.set_trainable(net, False)
+    optim_dict=None
+    top_Ns = [50, 100]
+    #  network.weights_normal_init(net, dev=0.01)
+    if args.finetune_language_model:
+        print('Only finetuning the language model from: {}'.format(args.resume_model))
+        args.train_all = False
+        if len(args.resume_model) == 0:
+            raise Exception('[resume_model] not specified')
+        network.load_net(args.resume_model, net)
+        optimizer_select = 3
+        best_recall = np.zeros(len(top_Ns))
+        start_epoch = 0
+    elif args.load_RPN:
+        print('Loading pretrained RPN: {}'.format(args.saved_model_path))
+        args.train_all = False
+        network.load_net(args.saved_model_path, net.rpn)
+        net.reinitialize_fc_layers()
+        optimizer_select = 1
+        start_epoch = 0
+        best_recall = np.zeros(len(top_Ns))
+
+    elif args.resume_training:
+        print('Resume training from: {}'.format(args.resume_model))
+        if len(args.resume_model) == 0:
+            raise Exception('[resume_model] not specified')
+        network.load_net(args.resume_model, net)
+        args.train_all = True
+        optimizer_select = 2
+        net, optim_dict, start_epoch, best_recall, recall = network.load_checkpoint(args.resume_model,net)
+        '''
+        recall = test(test_loader, net, top_Ns)
+        print('======= Testing Result =======')
+        for idx, top_N in enumerate(top_Ns):
+            print('[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
+                top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
+        print('==============================')
+        '''
+    else:
+        print('Training from scratch.')
+        net.rpn.initialize_parameters()
+        net.reinitialize_fc_layers()
+        optimizer_select = 0
+        args.train_all = True
+        start_epoch =0
+        best_recall = np.zeros(len(top_Ns))
+
+    optimizer = network.get_optimizer(lr,optimizer_select, args,
+                cnn_features_var, rpn_features, hdn_features, language_features,optim_dict)
+
+    target_net = net
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+
+
+
+
+
+
+    if args.evaluate:
+        recall = test(test_loader, net, top_Ns)
+        print('======= Testing Result =======')
+        for idx, top_N in enumerate(top_Ns):
+            print('[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
+                top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
+
+        print('==============================')
+    else:
+        for epoch in range(start_epoch, args.max_epoch):
+            # Training
+            train(train_loader, target_net, optimizer, epoch)
+
+            # Testing
+            # network.set_trainable(net, False) # Without backward(), requires_grad takes no effect
+            recall = test(test_loader, net, top_Ns)
+
+            # updating learning policy
+            if epoch % args.step_size == 0 and epoch > 0:
+                lr /= 10
+                args.lr = lr
+                print('[learning rate: {}]'.format(lr))
+
+                args.enable_clip_gradient = False
+                if not args.finetune_language_model:
+                    args.train_all = True
+                    optimizer_select = 2
+                # update optimizer and correponding requires_grad state
+                optimizer = network.get_optimizer(lr, optimizer_select, args,
+                            cnn_features_var, rpn_features, hdn_features, language_features)
+
+            # snapshot the state
+            network.save_checkpoint(args, net, optimizer, best_recall, recall, epoch)
+
+            # save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name,epoch))
+            # network.save_net(save_name, net)
+            # torch.save({
+            #     'epoch': epoch,
+            #     'model': net.state_dict(),
+            #     'optimizer':optimizer.state_dict(),
+            #     'best_recall': best_recall,
+            #     'recall': recall,
+            # }, save_name[:-2]+'pth')
+            # print('save model: {}'.format(save_name))
+            # if np.all(recall > best_recall):
+            #     best_recall = recall
+            #     save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name))
+            #     network.save_net(save_name, net)
+            #     torch.save({
+            #         'epoch': epoch,
+            #         'model': net.state_dict(),
+            #         'optimizer': optimizer.state_dict(),
+            #         'best_recall': best_recall,
+            #         'recall': recall,
+            #     }, save_name[:-2] + 'pth')
+            #     print('\nsave model: {}'.format(save_name))
+
+
+            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
+            for idx, top_N in enumerate(top_Ns):
+                print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
+                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100)),
