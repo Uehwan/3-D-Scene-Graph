@@ -75,20 +75,31 @@ def get_model_name(arguments):
     return arguments
 
 
-def group_features(net_):
-    vgg_features_fix = list(net_.rpn.features.parameters())[:8]
-    vgg_features_var = list(net_.rpn.features.parameters())[8:]
-    vgg_feature_len = len(list(net_.rpn.features.parameters()))
-    rpn_feature_len = len(list(net_.rpn.parameters())) - vgg_feature_len
-    rpn_features = list(net_.rpn.parameters())[vgg_feature_len:]
+def group_features(net_,cnn_type = 'vgg'):
+    if cnn_type == 'vgg':
+        cnn_features_fix = list(net_.rpn.features.parameters())[:8]
+        cnn_features_var = list(net_.rpn.features.parameters())[8:]
+    elif cnn_type == 'resnet' or cnn_type == 'senet':
+        # cnn_features_fix = []
+        # for i in range(len(net_.rpn.features)-1):
+        #     cnn_features_fix.extend(list(net_.rpn.features[i].parameters()))
+        # cnn_features_var = list(net_.rpn.features[-1].parameters())
+        cnn_features_fix = list(net_.rpn.features.parameters())[:-1]
+        cnn_features_var = list(net_.rpn.features.parameters())[-1]
+    else:
+        raise NotImplementedError
+
+    cnn_features_len = len(list(net_.rpn.features.parameters()))
+    rpn_feature_len = len(list(net_.rpn.parameters())) - cnn_features_len
+    rpn_features = list(net_.rpn.parameters())[cnn_features_len:]
     language_features = list(net_.caption_prediction.parameters())
     language_feature_len = len(language_features)
-    hdn_features = list(net_.parameters())[(rpn_feature_len + vgg_feature_len):(-1 * language_feature_len)]
-    print 'vgg feature length:', vgg_feature_len
-    print 'rpn feature length:', rpn_feature_len
-    print 'HDN feature length:', len(hdn_features)
-    print 'language_feature_len:', language_feature_len
-    return vgg_features_fix, vgg_features_var, rpn_features, hdn_features, language_features
+    hdn_features = list(net_.parameters())[(rpn_feature_len + cnn_features_len):(-1 * language_feature_len)]
+    print('cnn feature length:', cnn_features_len)
+    print('rpn feature length:', rpn_feature_len)
+    print('HDN feature length:', len(hdn_features))
+    print('language_feature_len:', language_feature_len)
+    return cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features
 
 
 

@@ -142,7 +142,7 @@ if __name__ == '__main__':
         optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum,
                                     weight_decay=0.0005)
     elif args.cnn_type == 'resnet':
-        optimizer = torch.optim.SGD(list(net.features.parameters())[72:] +
+        optimizer = torch.optim.SGD(list(net.features[-1].parameters()) +
                                     list(net.conv1.parameters()) +
                                     list(net.score_conv.parameters()) +
                                     list(net.bbox_conv.parameters()) +

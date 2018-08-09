@@ -35,6 +35,7 @@ parser.add_argument('--resume_model', type=str, default='', help='The model we r
 parser.add_argument('--load_RPN', action='store_true', help='To end-to-end train from the scratch')
 parser.add_argument('--enable_clip_gradient', action='store_true', help='Whether to clip the gradient')
 parser.add_argument('--use_normal_anchors', action='store_true', help='Whether to use kmeans anchors')
+parser.add_argument('--load_optim', action='store_true', help='Whether to load optimizer state_dict')
 
 
 # structure settings
@@ -54,8 +55,8 @@ parser.set_defaults(region_bbox_reg=True)
 parser.add_argument('--use_kernel_function', action='store_true')
 # Environment Settings
 parser.add_argument('--seed', type=int, default=1, help='set seed to some constant value to reproduce experiments')
-parser.add_argument('--saved_model_path', type=str, default = 'output/RPN/RPN_ful_region_resnet101_best.h5', help='The Model used for initialize')
-parser.add_argument('--dataset_option', type=str, default='small', help='The dataset to use (small | normal | fat)')
+parser.add_argument('--saved_model_path', type=str, default = 'output/RPN/RPN_full_region_resnet101_best.h5', help='The Model used for initialize')
+parser.add_argument('--dataset_option', type=str, default='normal', help='The dataset to use (small | normal | fat)')
 parser.add_argument('--output_dir', type=str, default='./output/HDN', help='Location to output the model')
 parser.add_argument('--model_name', type=str, default='HDN', help='The name for saving model.')
 parser.add_argument('--nesterov', action='store_true', help='Set to use the nesterov for SGD')
@@ -147,7 +148,7 @@ def train(train_loader, target_net, optimizer, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
+        #print(batch_time.avg)
         # Logging the training loss
         if  (i + 1) % args.log_interval == 0:
             print('Epoch: [{0}][{1}/{2}] [lr: {lr}] [Solver: {solver}]\n'
@@ -271,7 +272,7 @@ if __name__ == '__main__':
     print(net)
 
     # To group up the features
-    cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features = group_features(net)
+    cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features = group_features(net,args.cnn_type)
 
     # Setting the state of the training model
     net.cuda()
@@ -308,10 +309,13 @@ if __name__ == '__main__':
         print('Resume training from: {}'.format(args.resume_model))
         if len(args.resume_model) == 0:
             raise Exception('[resume_model] not specified')
-        network.load_net(args.resume_model, net)
+        #network.load_net(args.resume_model, net)
         args.train_all = True
         optimizer_select = 2
-        net, optim_dict, start_epoch, best_recall, recall = network.load_checkpoint(args.resume_model,net)
+        net, optim_dict, start_epoch, best_recall, recall = network.load_checkpoint(fname= args.resume_model,
+                                                                                    net = net,
+                                                                                    optimizer = None,
+                                                                                    load_optim = args.load_optim)
         '''
         recall = test(test_loader, net, top_Ns)
         print('======= Testing Result =======')

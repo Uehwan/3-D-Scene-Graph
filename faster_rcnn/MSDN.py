@@ -74,7 +74,7 @@ class Hierarchical_Descriptive_Model(HDN_base):
         self.cnn_type=cnn_type
         if cnn_type == 'vgg':
             self.nConvChannel= 512
-        elif cnn_type == 'resnet':
+        elif cnn_type == 'resnet' or cnn_type == 'senet':
             self.nConvChannel = 1024
         else:
             raise NotImplementedError
@@ -94,7 +94,8 @@ class Hierarchical_Descriptive_Model(HDN_base):
         self.roi_pool_phrase = RoIPooling
         self.roi_pool_region = RoIPooling
 
-        self.conv = cfg.USE_CONV and cnn_type == 'resnet'
+        self.conv = cfg.USE_CONV and cnn_type in ['resnet','senet']
+        print('conv:',self.conv)
         if self.conv:
             self.conv6_obj = network.Conv2d(self.nConvChannel,nhidden, kernel_size=7, relu=True, bn=True)
             self.conv6_phrase = network.Conv2d(self.nConvChannel,nhidden, kernel_size=7, relu=True, bn=True)

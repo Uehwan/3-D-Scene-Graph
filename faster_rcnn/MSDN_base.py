@@ -105,7 +105,7 @@ class HDN_base(nn.Module):
             self.fc7_phrase.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
             self.fc7_region.fc.weight.data.copy_(vgg16.classifier[3].weight.data[:self.nhidden, :self.nhidden] * weight_multiplier)
             self.fc7_region.fc.bias.data.copy_(vgg16.classifier[3].bias.data[:self.nhidden])
-        elif self.cnn_type == 'resnet':
+        elif self.cnn_type == 'resnet' or self.cnn_type == 'senet':
             print('Initializing fc layers for resnet has not been implemented yet')
         else:
             raise NotImplementedError
