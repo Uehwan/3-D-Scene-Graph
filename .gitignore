@@ -112,3 +112,4 @@ eval/*.json
 
 pretrained_models/
 vis_result/
+*.pdf

@@ -68,6 +68,7 @@ def save_checkpoint(args,net,optimizer,best_recall,recall,epoch):
             'recall': recall,
         }, save_name[:-2] + 'pth')
         print('\nsave model: {}'.format(save_name))
+    return best_recall
 
 def load_net(fname, net):
     import h5py

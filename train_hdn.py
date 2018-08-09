@@ -222,7 +222,7 @@ def test(test_loader, net, top_Ns):
 
 
 if __name__ == '__main__':
-    global args, optimizer_select
+    #global args, optimizer_select
     # To set the model name automatically
     print(args)
     lr = args.lr
@@ -373,7 +373,7 @@ if __name__ == '__main__':
                             cnn_features_var, rpn_features, hdn_features, language_features)
 
             # snapshot the state
-            network.save_checkpoint(args, net, optimizer, best_recall, recall, epoch)
+            best_recall = network.save_checkpoint(args, net, optimizer, best_recall, recall, epoch)
 
             # save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name,epoch))
             # network.save_net(save_name, net)
