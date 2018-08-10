@@ -84,8 +84,8 @@ def group_features(net_,cnn_type = 'vgg'):
         # for i in range(len(net_.rpn.features)-1):
         #     cnn_features_fix.extend(list(net_.rpn.features[i].parameters()))
         # cnn_features_var = list(net_.rpn.features[-1].parameters())
-        cnn_features_fix = list(net_.rpn.features.parameters())[:-1]
-        cnn_features_var = list(net_.rpn.features.parameters())[-1]
+        cnn_features_fix = list(net_.rpn.features.parameters())[:-2]
+        cnn_features_var = list(net_.rpn.features.parameters())[-2:]
     else:
         raise NotImplementedError
 

@@ -233,14 +233,14 @@ def get_optimizer(lr, mode, args, cnn_features_var, rpn_features, hdn_features, 
         
 
     elif mode == 2: # mode 2: resume training
-        set_trainable_param(rpn_features, True)
-        set_trainable_param(cnn_features_var, True)
+        #set_trainable_param(rpn_features, True)
+        #set_trainable_param(cnn_features_var, True)
         set_trainable_param(hdn_features, True)
         set_trainable_param(language_features, True)
         if args.optimizer == 0:
             optimizer = torch.optim.SGD([
-                {'params': rpn_features},
-                {'params': cnn_features_var, 'lr': lr * 0.1},
+          #      {'params': rpn_features},
+         #       {'params': cnn_features_var, 'lr': lr * 0.1},
                 {'params': hdn_features}, 
                 {'params': language_features, 'weight_decay': 0.0}
                 ], lr=lr, momentum=args.momentum, weight_decay=0.0005, nesterov=args.nesterov)
