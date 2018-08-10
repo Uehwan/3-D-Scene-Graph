@@ -49,28 +49,22 @@ def save_checkpoint(args,net,optimizer,best_recall,recall,epoch):
     # snapshot the state
     save_name = os.path.join(args.output_dir, '{}_epoch_{}.h5'.format(args.model_name, epoch))
     save_net(save_name, net)
-    '''
-    torch.save({
+    checkpoint = {
         'epoch': epoch,
         'model': net.state_dict(),
         'optimizer': optimizer.state_dict(),
         'best_recall': best_recall,
         'recall': recall,
-    }, save_name[:-2] + 'pth')
+    }
+    torch.save(checkpoint, save_name[:-2] + 'pth')
     print('save model: {}'.format(save_name))
     if np.all(recall > best_recall):
         best_recall = recall
         save_name = os.path.join(args.output_dir, '{}_best.h5'.format(args.model_name))
         save_net(save_name, net)
-        torch.save({
-            'epoch': epoch,
-            'model': net.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'best_recall': best_recall,
-            'recall': recall,
-        }, save_name[:-2] + 'pth')
+        torch.save(checkpoint, save_name[:-2] + 'pth')
         print('\nsave model: {}'.format(save_name))
-    '''
+    del checkpoint
 
     return best_recall
 

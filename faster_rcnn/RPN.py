@@ -55,7 +55,8 @@ class RPN(nn.Module):
     anchor_scales_normal_region = [4, 8, 16, 32, 64]
     anchor_ratios_normal_region = [0.25, 0.5, 1, 2, 4]
 
-    def __init__(self, use_kmeans_anchors=False,cnn_type='vgg',model_path='./pretrained_models/resnet101_caffe.pth'):
+    def __init__(self, use_kmeans_anchors=False,cnn_type='resnet',model_path='./pretrained_models/resnet101_caffe.pth',
+                 num_fix_blocks = 0):
         super(RPN, self).__init__()
 
         if cnn_type == 'vgg':
@@ -73,22 +74,25 @@ class RPN(nn.Module):
             self.features = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu,
                                            resnet.maxpool, resnet.layer1, resnet.layer2, resnet.layer3)
             # Fix blocks
-            for p in self.features[0].parameters(): p.requires_grad = False
-            for p in self.features[1].parameters(): p.requires_grad = False
-            assert (0 <= cfg.RESNET.FIXED_BLOCKS < 4)
-            if cfg.RESNET.FIXED_BLOCKS >= 3:
-                for p in self.features[6].parameters(): p.requires_grad = False
-            if cfg.RESNET.FIXED_BLOCKS >= 2:
-                for p in self.features[5].parameters(): p.requires_grad = False
-            if cfg.RESNET.FIXED_BLOCKS >= 1:
-                for p in self.features[4].parameters(): p.requires_grad = False
+            # for p in self.features[0].parameters(): p.requires_grad = False
+            # for p in self.features[1].parameters(): p.requires_grad = False
+            # assert (0 <= cfg.RESNET.FIXED_BLOCKS < 4)
+            # if cfg.RESNET.FIXED_BLOCKS >= 3:
+            #     for p in self.features[6].parameters(): p.requires_grad = False
+            # if cfg.RESNET.FIXED_BLOCKS >= 2:
+            #     for p in self.features[5].parameters(): p.requires_grad = False
+            # if cfg.RESNET.FIXED_BLOCKS >= 1:
+            #     for p in self.features[4].parameters(): p.requires_grad = False
+            for i in range(len(self.features)-num_fix_blocks):
+                for p in self.features[i].parameters(): p.requires_grad = False
+
             #del resnet.layer4
         elif cnn_type == 'senet':
             self.nConvChannel = 1024
             senet = pretrainedmodels.senet154(1000)
             senet = nn.Sequential(*list(senet.children())[:-4])
             self.features = senet
-            for i in range(len(self.features)-1):
+            for i in range(len(self.features)-num_fix_blocks):
                 for p in self.features[i].parameters(): p.requires_grad = False
 
         else:
