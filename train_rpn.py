@@ -26,6 +26,7 @@ parser.add_argument('--log_interval', type=int, default=500, help='Interval for 
 parser.add_argument('--disable_clip_gradient', action='store_true', help='Whether to clip the gradient')
 parser.add_argument('--use_normal_anchors', action='store_true', help='Whether to use kmeans anchors')
 parser.add_argument('--step_size', type=int, default=2, help='step to decay the learning rate')
+parser.add_argument('--train_blocks', type= int, default = 0, help = 'the number of blocks to train in cnn' )
 
 ## Environment Settings
 parser.add_argument('--cnn_type', type=str, default ='resnet', help='vgg, resnet, senet')
@@ -129,7 +130,6 @@ def test(test_loader, target_net):
     return recall
 
 if __name__ == '__main__':
-    global args
     print("Loading training set and testing set...")
     train_set = visual_genome(args.dataset_option, 'train')
     test_set = visual_genome('small', 'test')
@@ -141,25 +141,17 @@ if __name__ == '__main__':
     if args.cnn_type == 'vgg':
         optimizer = torch.optim.SGD(list(net.parameters())[26:], lr=args.lr, momentum=args.momentum,
                                     weight_decay=0.0005)
-    elif args.cnn_type == 'resnet':
-        optimizer = torch.optim.SGD(list(net.features[-1].parameters()) +
-                                    list(net.conv1.parameters()) +
-                                    list(net.score_conv.parameters()) +
-                                    list(net.bbox_conv.parameters()) +
-                                    list(net.conv1_region.parameters()) +
-                                    list(net.score_conv_region.parameters()) +
-                                    list(net.bbox_conv_region.parameters())
-                                    , lr=args.lr, momentum=args.momentum,
-                                    weight_decay=0.0005)
-    elif args.cnn_type == 'senet':
-        optimizer = torch.optim.SGD(list(net.features[-1].parameters()) +
-                                    list(net.conv1.parameters()) +
-                                    list(net.score_conv.parameters()) +
-                                    list(net.bbox_conv.parameters()) +
-                                    list(net.conv1_region.parameters()) +
-                                    list(net.score_conv_region.parameters()) +
-                                    list(net.bbox_conv_region.parameters())
-                                    , lr=args.lr, momentum=args.momentum,
+    elif args.cnn_type in ['resnet','senet']:
+        params = list(net.conv1.parameters()) +\
+                 list(net.score_conv.parameters()) +\
+                 list(net.bbox_conv.parameters()) +\
+                 list(net.conv1_region.parameters()) +\
+                 list(net.score_conv_region.parameters()) +\
+                 list(net.bbox_conv_region.parameters())
+        if args.train_blocks > 0:
+            for i in range(args.train_blocks):
+                params += list(net.features[-i].parameters())
+        optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum,
                                     weight_decay=0.0005)
     else:
         raise NotImplementedError

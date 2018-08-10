@@ -267,8 +267,8 @@ if __name__ == '__main__':
                  pooling_method=args.pooling_method)
 
     params = list(net.parameters())
-    for param in params:
-        print(param.size())
+    #for param in params:
+    #    print(param.size())
     print(net)
 
     # To group up the features
@@ -311,11 +311,11 @@ if __name__ == '__main__':
             raise Exception('[resume_model] not specified')
         #network.load_net(args.resume_model, net)
         args.train_all = True
-        optimizer_select = 2
         net, optim_dict, start_epoch, best_recall, recall = network.load_checkpoint(fname= args.resume_model,
                                                                                     net = net,
                                                                                     optimizer = None,
                                                                                     load_optim = args.load_optim)
+        optimizer_select = 2 if start_epoch > 2 else 1
         '''
         recall = test(test_loader, net, top_Ns)
         print('======= Testing Result =======')
