@@ -66,7 +66,8 @@ class Hierarchical_Descriptive_Model(HDN_base):
                  rnn_droptout=0.0, rnn_bias=False, 
                  use_region_reg=False, use_kernel=False,
                  cnn_type='vgg',
-                 pooling_method='roi_pool'):
+                 pooling_method='roi_pool',
+                 joint_type = 'conv'):
     
         super(Hierarchical_Descriptive_Model, self).__init__(nhidden, n_object_cats, n_predicate_cats, n_vocab, voc_sign, 
                  max_word_length, MPS_iter, use_language_loss, object_loss_weight, predicate_loss_weight, 
@@ -94,7 +95,8 @@ class Hierarchical_Descriptive_Model(HDN_base):
         self.roi_pool_phrase = RoIPooling
         self.roi_pool_region = RoIPooling
 
-        self.conv = cfg.USE_CONV and cnn_type in ['resnet','senet']
+        self.conv = True if joint_type == 'conv' else False
+        print(cfg.USE_CONV)
         print('conv:',self.conv)
         if self.conv:
             self.conv6_obj = network.Conv2d(self.nConvChannel,nhidden, kernel_size=7, relu=True, bn=True)

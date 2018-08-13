@@ -333,7 +333,7 @@ __C.RESNET.MAX_POOL = False
 # Number of fixed blocks during training, by default the first of all 4 blocks is fixed
 # Range: 0 (none) to 3 (all)
 __C.RESNET.FIXED_BLOCKS = 2
-__C.USE_CONV = False
+__C.USE_CONV = True
 
 
 def get_output_dir(imdb, weights_filename):

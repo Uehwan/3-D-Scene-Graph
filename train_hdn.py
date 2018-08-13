@@ -16,8 +16,8 @@ import pdb
 # To log the training process
 from tensorboard_logger import configure, log_value
 '''Training command example'''
-# Train from scratch
-# CUDA_VISIBLE_DEVICES=0 python train_hdn.py --load_RPN --saved_model_path=./output/RPN/RPN_full__region_resnet101_best.h5  --dataset_option=normal --enable_clip_gradient --step_size=2 --MPS_iter=1 --caption_use_bias --caption_use_dropout --rnn_type LSTM_normal --cnn_type resnet --pooling_method roi_align
+# Train with pre-trained RPN
+# CUDA_VISIBLE_DEVICES=0 python train_hdn.py --load_RPN --saved_model_path=./output/RPN/RPN_full_region_resnet101_best.h5  --dataset_option=normal --enable_clip_gradient --step_size=2 --MPS_iter=1 --caption_use_bias --caption_use_dropout --rnn_type LSTM_normal --cnn_type resnet --pooling_method roi_align
 # Resume training
 # CUDA_VISIBLE_DEVICES=1 python train_hdn.py --resume_training --resume_model ./output/HDN/HDN_1_iters_alt_normal_I_LSTM_with_bias_with_dropout_0_5_nembed_256_nhidden_512_with_region_regression_SGD_resnet_roi_align_epoch_0.h5 --dataset_option=normal --enable_clip_gradient --step_size=2 --MPS_iter=1 --caption_use_bias --caption_use_dropout --rnn_type LSTM_normal --cnn_type resnet --pooling_method roi_align
 
@@ -68,6 +68,8 @@ parser.add_argument('--evaluate', action='store_true', help='Only use the testin
 parser.add_argument('--only_predicate', action='store_true', help='evaluate only predicate')
 parser.add_argument('--cnn_type', type=str, default='resnet', help='vgg or resnet')
 parser.add_argument('--pooling_method', type=str, default='roi_crop', help='roi_pool, roi_align, or roi_crop')
+parser.add_argument('--joint_type', type=str, default='conv', help='conv or fc')
+
 args = parser.parse_args()
 # Overall loss logger
 overall_train_loss = network.AverageMeter()
@@ -267,7 +269,8 @@ if __name__ == '__main__':
                  use_region_reg = args.region_bbox_reg,
                  use_kernel = args.use_kernel_function,
                  cnn_type=args.cnn_type,
-                 pooling_method=args.pooling_method)
+                 pooling_method=args.pooling_method,
+                 joint_type = args.joint_type)
 
     params = list(net.parameters())
     #for param in params:
@@ -287,7 +290,7 @@ if __name__ == '__main__':
 
 
     network.set_trainable(net, False)
-    optim_dict=None
+
     top_Ns = [50, 100]
     #  network.weights_normal_init(net, dev=0.01)
     if args.finetune_language_model:
@@ -297,6 +300,7 @@ if __name__ == '__main__':
             raise Exception('[resume_model] not specified')
         network.load_net(args.resume_model, net)
         optimizer_select = 3
+        optim_dict = None
         best_recall = np.zeros(len(top_Ns))
         start_epoch = 0
     elif args.load_RPN:
@@ -305,6 +309,7 @@ if __name__ == '__main__':
         network.load_net(args.saved_model_path, net.rpn)
         net.reinitialize_fc_layers()
         optimizer_select = 1
+        optim_dict = None
         start_epoch = 0
         best_recall = np.zeros(len(top_Ns))
 
@@ -332,6 +337,7 @@ if __name__ == '__main__':
         net.rpn.initialize_parameters()
         net.reinitialize_fc_layers()
         optimizer_select = 0
+        optim_dict = None
         args.train_all = True
         start_epoch =0
         best_recall = np.zeros(len(top_Ns))
@@ -339,7 +345,6 @@ if __name__ == '__main__':
     optimizer = network.get_optimizer(lr,optimizer_select, args,
                 cnn_features_var, rpn_features, hdn_features, language_features,optim_dict)
 
-    target_net = net
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
 
@@ -359,11 +364,16 @@ if __name__ == '__main__':
     else:
         for epoch in range(start_epoch, args.max_epoch):
             # Training
-            train(train_loader, target_net, optimizer, epoch)
+            train(train_loader, net, optimizer, epoch)
 
             # Testing
             # network.set_trainable(net, False) # Without backward(), requires_grad takes no effect
             recall = test(test_loader, net, top_Ns)
+            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
+            for idx, top_N in enumerate(top_Ns):
+                print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
+                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
+
 
             # updating learning policy
             if epoch % args.step_size == 0 and epoch > 0:
@@ -409,10 +419,7 @@ if __name__ == '__main__':
             #     print('\nsave model: {}'.format(save_name))
 
 
-            print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
-            for idx, top_N in enumerate(top_Ns):
-                print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
-                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
+
 
 
 

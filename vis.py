@@ -129,8 +129,8 @@ class scene_graph(object):
             sg.edge('struct'+str(self.data.relation[self.img_count][j][0])+':'+str(self.data.relation[self.img_count][j][0]),
                     'struct'+str(self.data.relation[self.img_count][j][2])+':'+str(self.data.relation[self.img_count][j][2]),
                     str(test_set.predicate_classes[self.data.relation[self.img_count][j][1]]))
-        sg.render('scene_graph_test/scene-graph_'+str(idx)+'.gv.pdf', view=True, cleanup=False)
-        sg.clear()
+        #sg.render('scene_graph_test/scene-graph_'+str(idx)+'.gv.pdf', view=True, cleanup=False)
+        #sg.clear()
 
         #sg.view()
         self.img_count+=1

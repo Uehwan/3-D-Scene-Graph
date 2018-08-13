@@ -23,6 +23,7 @@ TIME_IT = cfg.TIME_IT
 args = parse_args()
 args.resume_training=True
 args.resume_model = './pretrained_models/HDN_1_iters_alt_normal_I_LSTM_with_bias_with_dropout_0_5_nembed_256_nhidden_512_with_region_regression_resume_SGD_best.h5'
+args.resume_model = './output/HDN/HDN_1_iters_alt_normal_I_LSTM_with_bias_with_dropout_0_5_nembed_256_nhidden_512_with_region_regression_resume_SGD_resnet_roi_align_epoch_4.h5'
 args.dataset_option = 'normal'
 args.MPS_iter =1
 args.caption_use_bias = True
@@ -30,7 +31,7 @@ args.caption_use_dropout = True
 args.rnn_type = 'LSTM_normal'
 args.evaluate = True
 args.cnn_type = 'resnet'
-args.pooling_method = 'roi_crop'
+args.pooling_method = 'roi_align'
 # To set the model name automatically
 print(args)
 lr = args.lr
@@ -67,7 +68,9 @@ net = Hierarchical_Descriptive_Model(nhidden=args.mps_feature_len,
              rnn_type=args.rnn_type,
              rnn_droptout=args.caption_use_dropout, rnn_bias=args.caption_use_bias,
              use_region_reg = args.region_bbox_reg,
-             use_kernel = args.use_kernel_function)
+             use_kernel = args.use_kernel_function,
+             cnn_type = args.cnn_type,
+             pooling_method = args.pooling_method)
 # params = list(net.parameters())
 # for param in params:
 #     print param.size()
@@ -170,8 +173,8 @@ for idx in range(imgLoader.num_frames)[0:]:
     cv2.namedWindow(winname_caption)  # Create a named window
     cv2.moveWindow(winname_caption, 10, 500)
     cv2.imshow(winname_caption, image_caption)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+    #cv2.destroyAllWindows()
 
 
 
