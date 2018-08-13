@@ -72,7 +72,7 @@ def get_model_name(arguments):
     arguments.model_name += '_'+arguments.cnn_type
     arguments.model_name += '_'+arguments.pooling_method
     arguments.model_name += '_'+arguments.joint_type
-    
+
     return arguments
 
 

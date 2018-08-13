@@ -275,7 +275,7 @@ if __name__ == '__main__':
     params = list(net.parameters())
     #for param in params:
     #    print(param.size())
-    print(net)
+    #print(net)
 
     # To group up the features
     cnn_features_fix, cnn_features_var, rpn_features, hdn_features, language_features = group_features(net,args.cnn_type)
