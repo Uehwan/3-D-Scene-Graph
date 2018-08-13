@@ -292,8 +292,19 @@ def get_optimizer(lr, mode, args, cnn_features_var, rpn_features, hdn_features, 
     else:
         raise NotImplementedError
 
-
+    if state_dict:
+        optimizer.load_state_dict(state_dict)
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if torch.is_tensor(v):
+                    state[k] = v.cuda()
+    
     return optimizer
+
+
+def optimizer_add_params(lr, optimizer,params):
+    set_trainable_param(params, True)
+    optimizer.add_param_group({'params': params, 'lr': lr})
 
 
 

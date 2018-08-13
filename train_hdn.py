@@ -144,6 +144,7 @@ def train(train_loader, target_net, optimizer, epoch):
         if args.enable_clip_gradient:
             network.clip_gradient(target_net, 10.)
         optimizer.step()
+        del im_data, im_info, gt_objects, gt_relationships, gt_regions
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -181,6 +182,7 @@ def train(train_loader, target_net, optimizer, epoch):
             log_value('RPN_loss loss', overall_train_rpn_loss.avg, overall_train_rpn_loss.count)
             log_value('caption loss', overall_train_region_caption_loss.avg, overall_train_region_caption_loss.count)
 
+
 def test(test_loader, net, top_Ns):
 
     global args
@@ -204,6 +206,7 @@ def test(test_loader, net, top_Ns):
         total_cnt_t, rel_cnt_correct_t = net.evaluate(
             im_data, im_info, gt_objects.numpy()[0], gt_relationships.numpy()[0], gt_regions.numpy()[0],
             top_Ns = top_Ns, nms=True,only_predicate=args.only_predicate)
+        del im_data, im_info, gt_objects, gt_relationships, gt_regions
         rel_cnt += total_cnt_t
         rel_cnt_correct += rel_cnt_correct_t
         batch_time.update(time.time() - end)
@@ -364,17 +367,20 @@ if __name__ == '__main__':
 
             # updating learning policy
             if epoch % args.step_size == 0 and epoch > 0:
-                lr /= 10
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] /= 10
+                lr = optimizer.param_groups[0]['lr']
                 args.lr = lr
                 print('[learning rate: {}]'.format(lr))
 
                 args.enable_clip_gradient = False
                 if not args.finetune_language_model:
-                    args.train_all = True
-                    optimizer_select = 2
-                # update optimizer and correponding requires_grad state
-                optimizer = network.get_optimizer(lr, optimizer_select, args,
-                            cnn_features_var, rpn_features, hdn_features, language_features)
+                    if optimizer_select == 1:
+                        args.train_all = True
+                        optimizer_select = 2
+                        # update optimizer and corresponding requires_grad state
+                        network.optimizer_add_params(lr*0.1,optimizer,cnn_features_var)
+                        network.optimizer_add_params(lr*0.1,optimizer,rpn_features)
 
             # snapshot the state
             best_recall = network.save_checkpoint(args, net, optimizer, best_recall, recall, epoch)
@@ -406,4 +412,8 @@ if __name__ == '__main__':
             print('Epoch[{epoch:d}]:'.format(epoch = epoch)),
             for idx, top_N in enumerate(top_Ns):
                 print('\t[Recall@{top_N:d}] {recall:2.3f}%% (best: {best_recall:2.3f}%%)'.format(
-                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100)),
+                    top_N=top_N, recall=recall[idx] * 100, best_recall=best_recall[idx] * 100))
+
+
+
+
