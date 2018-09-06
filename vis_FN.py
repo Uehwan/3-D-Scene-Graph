@@ -1,5 +1,5 @@
 import sys
-sys.path.append('FactorizableNet')
+sys.path.append('./FactorizableNet')
 import random
 import numpy as np
 import argparse
@@ -18,13 +18,13 @@ import warnings
 parser = argparse.ArgumentParser('Options for training Hierarchical Descriptive Model in pytorch')
 
 parser.add_argument('--path_opt', default='options/models/VG-DR-Net.yaml', type=str,
-                    help='path to a yaml options file')
+                    help='path to a yaml options file, VG-DR-Net.yaml or VG-MSDN.yaml')
 parser.add_argument('--dataset_option', type=str, default='normal', help='data split selection [small | fat | normal]')
 parser.add_argument('--batch_size', type=int, help='#images per batch')
 parser.add_argument('--workers', type=int, default=4, help='#idataloader workers')
 # model init
 parser.add_argument('--pretrained_model', type=str, default = 'FactorizableNet/output/trained_models/Model-VG-DR-Net.h5',
-                    help='path to pretrained_model')
+                    help='path to pretrained_model, Model-VG-DR-Net.h5 or Model-VG-MSDN.h5')
 
 # structure settings
 # Environment Settings
@@ -76,7 +76,6 @@ if __name__ == '__main__':
         'data':{
             'dataset_option': args.dataset_option,
             'batch_size': args.batch_size,
-          #  'opts': 'FactorizableNet/options/data_sVG.yaml'
         },
     }
     with open(args.path_opt, 'r') as handle:
@@ -86,8 +85,6 @@ if __name__ == '__main__':
         data_opts = yaml.load(f)
         options['data']['dataset_version'] = data_opts.get('dataset_version', None)
         options['opts'] = data_opts
-        #options['opts']['dir'] = 'FactorizableNet/data/svg'
-        #options['model']['rpn_opts'] = 'FactorizableNet/options/RPN/RPN_FN_svg.yaml'
 
     print '## args'
     pprint(vars(args))
