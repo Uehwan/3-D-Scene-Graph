@@ -1,3 +1,7 @@
 [submodule "sort"]
 	path = sort
 	url = https://github.com/abewley/sort.git
+[submodule "FactorizableNet"]
+	path = FactorizableNet
+	url = https://github.com/yikang-li/FactorizableNet.git
+
