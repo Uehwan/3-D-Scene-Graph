@@ -251,11 +251,11 @@ for idx in range(imgLoader.num_frames)[0:]:
                   '{obj_cls:9} {obj_ID:4} {obj_score:1.2f}  |  '
                   '{triplet_score:1.3f}'.format(
                 sbj_cls=test_set.object_classes[int(obj_cls[int(relation[0])])], sbj_score=obj_scores[int(relation[0])],
-                sbj_ID=str(int(obj_boxes[relation[0]][4])),
+                sbj_ID=str(int(obj_boxes[int(relation[0])][4])),
                 pred_cls=test_set.predicate_classes[int(relation[2])],
                 pred_score=relation[3] / obj_scores[int(relation[0])] / obj_scores[int(relation[1])],
                 obj_cls=test_set.object_classes[int(obj_cls[int(relation[1])])], obj_score=obj_scores[int(relation[1])],
-                obj_ID=str(int(obj_boxes[relation[1]][4])),
+                obj_ID=str(int(obj_boxes[int(relation[1])][4])),
                 triplet_score=relation[3]))
 
 
