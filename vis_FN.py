@@ -17,13 +17,13 @@ import warnings
 
 parser = argparse.ArgumentParser('Options for training Hierarchical Descriptive Model in pytorch')
 
-parser.add_argument('--path_opt', default='options/models/VG-DR-Net.yaml', type=str,
+parser.add_argument('--path_opt', default='options/models/VG-MSDN.yaml', type=str,
                     help='path to a yaml options file, VG-DR-Net.yaml or VG-MSDN.yaml')
 parser.add_argument('--dataset_option', type=str, default='normal', help='data split selection [small | fat | normal]')
 parser.add_argument('--batch_size', type=int, help='#images per batch')
 parser.add_argument('--workers', type=int, default=4, help='#idataloader workers')
 # model init
-parser.add_argument('--pretrained_model', type=str, default = 'FactorizableNet/output/trained_models/Model-VG-DR-Net.h5',
+parser.add_argument('--pretrained_model', type=str, default = 'FactorizableNet/output/trained_models/Model-VG-MSDN.h5',
                     help='path to pretrained_model, Model-VG-DR-Net.h5 or Model-VG-MSDN.h5')
 
 # structure settings
@@ -121,6 +121,7 @@ if __name__ == '__main__':
 
 
     for i, sample in enumerate(test_loader): # (im_data, im_info, gt_objects, gt_relationships)
+        if i < 500: continue
         im_data = Variable(sample['visual'].cuda(), volatile=True)
         gt_objects = sample['objects'][0]
         gt_relationships = sample['relations'][0]
@@ -137,7 +138,7 @@ if __name__ == '__main__':
         sub_assignment, obj_assignment, total_score = \
             interpret_relationships(cls_prob_object, bbox_object, object_rois,
                                     cls_prob_predicate, mat_phrase, im_info,
-                                    nms=0.3, top_N=100,
+                                    nms=0.3, top_N=1,topk=1,
                                     use_gt_boxes=False,
                                     triplet_nms=0.01,
                                     reranked_score=reranked_score)
@@ -171,7 +172,7 @@ if __name__ == '__main__':
 
         print('-------Subject-------|------Predicate-----|--------Object---------|--Score-')
         for relation in relationships:
-            if relation[1] > 0:  # '0' is the class 'irrelevant'
+            if relation[2] > 0:  # '0' is the class 'irrelevant'
                 print('{sbj_cls:9} {sbj_ID:4} {sbj_score:1.2f}  |  '
                       '{pred_cls:11} {pred_score:1.2f}  |  '
                       '{obj_cls:9} {obj_ID:4} {obj_score:1.2f}  |  '
@@ -183,13 +184,20 @@ if __name__ == '__main__':
                     obj_ID=str(int(relation[1])),
                     triplet_score=relation[3]))
 
-        sample_img_path = './data/svg/images/' + test_set.annotations[i]['path']
-        img_scene = cv2.imread(sample_img_path)
-        colorlist = [(random.randint(0, 210), random.randint(0, 210), random.randint(0, 210)) for i in range(10000)]
-        img_scene = vis_object_detection(img_scene, test_set, obj_cls, obj_boxes, obj_scores)
-        cv2.imshow('sample',img_scene)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+            if relation[2]==9:
+                sample_img_path = './data/svg/images/' + test_set.annotations[i]['path']
+                img_scene = cv2.imread(sample_img_path)
+                colorlist = [(random.randint(0, 210), random.randint(0, 210), random.randint(0, 210)) for i in
+                             range(10000)]
+                img_scene = vis_object_detection(img_scene, test_set, obj_cls, obj_boxes, obj_scores)
+                cv2.imshow('sample', img_scene)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+
+
+        # cv2.imshow('sample',img_scene)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
         result = {'objects': {
             'bbox': obj_boxes,
