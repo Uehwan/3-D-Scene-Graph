@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./external/FactorizableNet')
+sys.path.append('./FactorizableNet')
 import argparse
 import numpy as np
 import os.path as osp

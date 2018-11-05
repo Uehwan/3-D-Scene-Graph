@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./external/FactorizableNet')
+sys.path.append('./FactorizableNet')
 import random
 import numpy.random as npr
 import numpy as np
