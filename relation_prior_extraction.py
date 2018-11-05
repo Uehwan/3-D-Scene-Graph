@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./FactorizableNet')
+sys.path.append('./external/FactorizableNet')
 import json
 import math
 import pickle

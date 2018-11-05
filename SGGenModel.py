@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./FactorizableNet')
+sys.path.append('./external/FactorizableNet')
 import models as models
 import numpy as np
 import torch.nn.functional as F

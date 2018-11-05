@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./FactorizableNet')
+sys.path.append('./external/FactorizableNet')
 from models.HDN_v2.utils import interpret_relationships
 from lib.fast_rcnn.nms_wrapper import nms
 from lib import network
