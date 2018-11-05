@@ -11,17 +11,19 @@ import lib.utils.general_utils as utils
 
 def parse_args():
     parser = argparse.ArgumentParser('Options for Running 3D-Scene-Graph-Generator in pytorch')
+
+    '''Hyper-params in FactorizableNet'''
+    # Pre-trained Model Settings
     parser.add_argument('--pretrained_model', type=str,
                         default='FactorizableNet/output/trained_models/Model-VG-DR-Net.h5',
                         help='path to pretrained_model, Model-VG-DR-Net.h5 or Model-VG-MSDN.h5')
     parser.add_argument('--path_opt', default='options/models/VG-DR-Net.yaml', type=str,
                         help='path to a yaml options file, VG-DR-Net.yaml or VG-MSDN.yaml')
+    # Data loader Settings
     parser.add_argument('--dataset_option', type=str, default='normal',
                         help='data split selection [small | fat | normal]')
     parser.add_argument('--batch_size', type=int, help='#images per batch')
     parser.add_argument('--workers', type=int, default=4, help='#idataloader workers')
-    # model init
-
     # Environment Settings
     parser.add_argument('--seed', type=int, default=1, help='set seed to some constant value to reproduce experiments')
     parser.add_argument('--nms', type=float, default=0.2,
@@ -30,7 +32,11 @@ def parse_args():
                         help='Triplet NMS threshold for post object NMS (negative means not NMS)')
     # testing settings
     parser.add_argument('--use_gt_boxes', action='store_true', help='Use ground truth bounding boxes for evaluation')
-    # Demo Settings by jmpark
+
+
+
+    '''Demo Settings in 3D-Scene-Graph'''
+    # Data loader Settings
     parser.add_argument('--dataset' ,type=str, default='scannet',
                         help='choose a dataset. Example: "visual_genome", "scannet","ETH-Pedcross2", "ETH-Sunnyday"')
     parser.add_argument('--scannet_path', type=str,
@@ -38,10 +44,44 @@ def parse_args():
     parser.add_argument('--mot_benchmark_path', type=str,
                         default='./data/mot_benchmark/')
     parser.add_argument('--vis_result_path',type=str,default='./vis_result')
+    # FactorizableNet Output Filtering Settings
     parser.add_argument('--obj_thres', type=float, default=0.25,
                         help='object recognition threshold score')
-    parser.add_argument('--triplet_thres', type=float, default=0.1,
+    parser.add_argument('--triplet_thres', type=float, default=0.08,
                         help='Triplet recognition threshold score ')
+    # Key-frame Extractor Settings
+    parser.add_argument('--thres_key', type=float, default=0.1,
+                        help=' ')
+    parser.add_argument('--thres_anchor', type=float, default=0.65,
+                        help=' ')
+    parser.add_argument('--max_group_len', type=float, default=10,
+                        help=' ')
+
+    parser.add_argument('--alpha', type=float, default=0.4,
+                        help='weight for Exponentially Weighted Summation')
+    parser.add_argument('--gain', type=float, default=25,
+                        help='gain for adaptive thresholding in blurry image detection. scene0507:45 scene0000:25')
+    parser.add_argument('--offset', type=float, default=1,
+                        help='offset for adaptive thresholding in blurry image detection')
+    parser.add_argument('--detect_cnt_thres', type=float, default=2,
+                        help='scene graph threshold')
+    parser.add_argument('--frame_start', type=int, default=0,
+                        help='frame_start')
+    parser.add_argument('--frame_end', type=int, default=5000,
+                        help='frame_end')
+    parser.add_argument('--disable_keyframe', action='store_true',
+                        help='disable keyframe extraction if true')
+    parser.add_argument('--disable_spurious', action='store_true',
+                        help='disable spurious rejection if true')
+    parser.add_argument('--disable_samenode', action='store_true',
+                        help='disable same node detection if true')
+    parser.add_argument('--pause_time', type=int, default=3000,
+                        help='pause time')
+    parser.add_argument('--plot_graph', action='store_true',
+                        help='plot graph if true')
+    parser.add_argument('--visualize', action='store_true',
+                        help='enable visualization')
+
     args = parser.parse_args()
 
     return args
@@ -86,9 +126,9 @@ class testImageLoader(object):
 
         if self.args.dataset == 'scannet':
             # Load an image from ScanNet Dataset
-            img_path = osp.join(self.img_folder_path, str(frame_idx) + '.jpg')
-            camera_pose = open(osp.join(self.scannet_pose_path, str(frame_idx) + '.txt')).read()
-            depth_img = Image.open(osp.join(self.scannet_depth_path,str(frame_idx) + '.png'))
+            img_path = osp.join(self.img_folder_path, str(frame_idx+1) + '.jpg')
+            camera_pose = open(osp.join(self.scannet_pose_path, str(frame_idx+1) + '.txt')).read()
+            depth_img = Image.open(osp.join(self.scannet_depth_path,str(frame_idx+1) + '.png'))
             # Preprocess loaded camera parameter and depth info
             depth_pix = depth_img.load()
             pix_depth = []

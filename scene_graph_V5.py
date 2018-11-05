@@ -18,9 +18,10 @@ import warnings
 from settings import parse_args, testImageLoader
 from PIL import Image
 from sort.sort import Sort,iou
-import interpret
 import os.path as osp
-import vis
+import os
+import interpret_V5
+import vis_V5
 from keyframe_extracion import keyframe_checker
 from SGGenModel import SGGen_MSDN, SGGen_DR_NET
 args = parse_args()
@@ -83,19 +84,19 @@ print('3D-Scene-Graph-Generator Demo: Object detection and Scene Graph Generatio
 print('--------------------------------------------------------------------------')
 imgLoader = testImageLoader(args)
 # Initial Sort tracker
-interpreter = interpret.interpreter(args,ENABLE_TRACKING=False)
-scene_graph = vis.scene_graph()
+interpreter = interpret_V5.interpreter(args,test_set,ENABLE_TRACKING=False)
+scene_graph = vis_V5.scene_graph(args)
 keyframe_extractor = keyframe_checker(args,
+                                      thresh_key=args.thres_key,
+                                      thresh_anchor=args.thres_anchor,
+                                      max_group_len=args.max_group_len,
                                       intrinsic_depth=imgLoader.intrinsic_depth,
-                                      alpha=0.3,
-                                      blurry_gain=32,
-                                      blurry_offset=0)
+                                      alpha=args.alpha,
+                                      blurry_gain=args.gain,
+                                      blurry_offset=args.offset,
+                                      depth_shape=(480,640))
 
-for idx in range(imgLoader.num_frames)[0:]:
-    #for idx in range(1000000000)[0:]:
-    #for idx in [100,118,119,162,163,195,212,2223,232,498]:
-    print('...........................................................................')
-    print('Image '+str(idx))
+for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
     print('...........................................................................')
     ''' 1. Load an color/depth image and camera parameter'''
     if args.dataset == 'scannet':
@@ -106,10 +107,7 @@ for idx in range(imgLoader.num_frames)[0:]:
             continue
         depth_img, pix_depth, inv_p_matrix, inv_R, Trans, camera_pose = None, None, None, None, None, None
     img_original_shape = image_scene.shape
-    #ratio = float(image_scene.shape[0]) / float(image_scene.shape[1])
-    #if ratio>0.4:
-    #    continue
-    #cv2.imwrite('./vis_result/raw'+str(idx)+'.jpg',image_scene)
+
 
     ''' 3. Pre-processing: Rescale & Normalization '''
     # Resize the image to target scale
@@ -124,32 +122,34 @@ for idx in range(imgLoader.num_frames)[0:]:
     im_data = test_set.transform(im_data) # normalize the image with the pre-defined min/std.
     im_data = Variable(im_data.cuda(), volatile=True).unsqueeze(0)
 
+
     ''' 2. Key-frame Extraction: Check if this frame is key-frame or anchor-frame'''
-    #if args.dataset == "scannet":
-    IS_KEY_OR_ANCHOR, blurry_score, blurry_thres = keyframe_extractor.check_frame(image_scene, depth_img, camera_pose)
-    winname_scene = '{idx:4}. blur_score: {score:4.2f}, blur_thres: {thres:4.1f}, KEY_OR_ANCHOR: {flag:5}' \
-        .format(idx=idx, score=blurry_score, thres=blurry_thres, flag=str(IS_KEY_OR_ANCHOR))
+    IS_KEY_OR_ANCHOR, sharp_score, sharp_thres = keyframe_extractor.check_frame(image_scene, depth_img, camera_pose)
+    winname_scene = '{idx:0004}. sharp_score: {score:05.1f}, sharp_thres: {thres:05.1f}, KEY_OR_ANCHOR: {flag:5}' \
+        .format(idx=idx, score=sharp_score, thres=sharp_thres, flag=str(IS_KEY_OR_ANCHOR))
     print(winname_scene)
-    if not IS_KEY_OR_ANCHOR:
-        cv2.namedWindow('sample')  # Create a named window
-        cv2.moveWindow('sample', 10, 10)
-        cv2.putText(image_scene,
+    image_original = image_scene.copy()
+    if args.visualize:
+        cv2.namedWindow('detection')  # Create a named window
+        cv2.moveWindow('detection', 10, 10)
+        cv2.putText(image_original,
                     winname_scene,
-                    (1,11),
+                    (1, 11),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
-                    #(150, 150, 150),
+                    # (150, 150, 150),
                     (30, 30, 200),
                     2)
-        cv2.imshow('sample', image_scene)
+        cv2.imshow('detection', image_original)
         cv2.waitKey(1)
+    if not IS_KEY_OR_ANCHOR:
         continue
 
-    ''' 4. Object Detection & Scene Graph Generation from the Pre-trained MSDN Model '''
+    ''' 3. Object Detection & Scene Graph Generation from the Pre-trained MSDN Model '''
     object_result, predicate_result = model.forward_eval(im_data, im_info, )
 
 
-    ''' 5. Post-processing: Interpret the Model Output '''
+    ''' 4. Post-processing: Interpret the Model Output '''
     # interpret the model output
     obj_boxes, obj_scores, obj_cls, \
     subject_inds, object_inds, \
@@ -158,57 +158,53 @@ for idx in range(imgLoader.num_frames)[0:]:
     predicate_inds, triplet_scores, relationships = \
         interpreter.interpret_graph(object_result, predicate_result,im_info)
 
-    # sbj_scores = [obj_scores[int(relation[0])] for relation in relationships]
-    # pred_scores = [relation[3] / obj_scores[int(relation[0])] / obj_scores[int(relation[1])] for relation in relationships]
-    # obj_scores = [obj_scores[int(relation[1])] for relation in relationships]
-    # triplet_scores = zip(sbj_scores, pred_scores, obj_scores)
 
-    ''' 6. Print Scene Graph '''
+    ''' 5. Print 2D Object Detection '''
     # original image_scene
-    image_scene = vis.vis_object_detection(image_scene, test_set, obj_cls[:,0], obj_boxes, obj_scores[:,0])
-    cv2.namedWindow('sample')  # Create a named window
-    cv2.moveWindow('sample', 10, 10)
-    cv2.putText(image_scene,
-                winname_scene,
-                (1, 11),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                #(150, 150, 150),
-                (30, 200, 30),
-                2)
-    cv2.imshow('sample', image_scene)
-    cv2.imwrite(osp.join(args.vis_result_path, str(idx) + '.jpg'), image_scene)
+    img_obj_detected = vis_V5.vis_object_detection(image_scene.copy(), test_set, obj_cls[:, 0], obj_boxes, obj_scores[:, 0])
 
-    print('-------Subject-------|------Predicate-----|--------Object---------|--Score-')
-    for i, relation in enumerate(relationships):
-        # print(test_set.object_classes[int(obj_cls[:, 0][int(relation[0])])])
-        # print(obj_scores[:, 0][int(relation[0])])
-        # print(str(int(obj_boxes[int(relation[0])][4])))
-        #
-        # print(str(int(obj_boxes[int(relation[1])][4])))
-        # print(relation[3])
-        if relation[1] > 0:  # '0' is the class 'irrelevant'
-            print('{sbj_cls:9} {sbj_ID:4} {sbj_score:1.2f}  |  '
-                  '{pred_cls:11} {pred_score:1.2f}  |  '
-                  '{obj_cls:9} {obj_ID:4} {obj_score:1.2f}  |  '
-                  '{triplet_score:1.3f}'.format(
-                sbj_cls=test_set.object_classes[int(obj_cls[:,0][int(relation[0])])],
-                sbj_score=obj_scores[:,0][int(relation[0])],
-                sbj_ID=str(int(obj_boxes[int(relation[0])][4])),
-                # sbj_ID=str(subject_IDs[i]),
+    if args.visualize:
+        cv2.namedWindow('detection')  # Create a named window
+        cv2.moveWindow('detection', 10, 10)
+        cv2.putText(img_obj_detected,
+                    winname_scene,
+                    (1, 11),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (30, 200, 30),
+                    2)
+        cv2.imshow('detection', img_obj_detected)
+    scene_name = args.scannet_path.split('/')[-1]
+    try: os.makedirs(osp.join(args.vis_result_path, scene_name,'original'))
+    except: pass
+    try: os.makedirs(osp.join(args.vis_result_path, scene_name,'detection'))
+    except: pass
+    cv2.imwrite(osp.join(args.vis_result_path, scene_name,'original',str(idx) + '.jpg'), image_scene)
+    cv2.imwrite(osp.join(args.vis_result_path, scene_name,'detection',str(idx) + '.jpg'), img_obj_detected)
 
-                pred_cls=test_set.predicate_classes[int(relation[2])],
-                pred_score=relation[3] / obj_scores[:,0][int(relation[0])] / obj_scores[:,0][int(relation[1])],
-                obj_cls=test_set.object_classes[int(obj_cls[:,0][int(relation[1])])],
-                obj_score=obj_scores[:,0][int(relation[1])],
-                obj_ID=str(int(obj_boxes[int(relation[1])][4])),
-                # obj_ID=str(object_IDs[i]),
-                triplet_score=relation[3]))
+    ''' 6. Merge Relations into 3D Scene Graph'''
+    updated_image_scene = scene_graph.vis_scene_graph(image_scene.copy(), idx, test_set,
+                                                      obj_cls, obj_boxes, obj_scores,
+                                                      subject_inds, predicate_inds, object_inds,
+                                                      subject_IDs, object_IDs, triplet_scores,relationships,
+                                                      pix_depth, inv_p_matrix, inv_R, Trans, dataset=args.dataset)
+    if args.visualize:
+        cv2.namedWindow('updated')  # Create a named window
+        cv2.moveWindow('updated', 700, 10)
+        cv2.putText(updated_image_scene,
+                    winname_scene,
+                    (1, 11),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (30, 200, 30),
+                    2)
+        cv2.imshow('updated', updated_image_scene)
+    try: os.makedirs(osp.join(args.vis_result_path, scene_name,'updated'))
+    except: pass
+    cv2.imwrite(osp.join(args.vis_result_path, scene_name,'updated','updated'+str(idx) +'.jpg'), updated_image_scene)
 
-    cv2.waitKey(2000)
-    #cv2.destroyAllWindows()
-    #cv2.destroyAllWindows()
-
+    if args.visualize:
+        cv2.waitKey(args.pause_time)
 
 
 

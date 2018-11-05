@@ -307,6 +307,7 @@ class keyframe_checker(object):
 
 
     def check_frame(self,img, depth, pose):
+        if self.args.disable_keyframe: return True, 0.0, 0.0
         if self.frame_num == 0:
             self.average_of_blurryness = blurryness(img)
             self.key_pose, self.anchor_pose, = [pose] * 2
