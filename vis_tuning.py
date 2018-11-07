@@ -327,7 +327,7 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
         elif img.shape[0]<int(1080*0.9):
             pad = cv2.resize(img.copy(), (int(1920 * 0.9), int(1080 * 0.9)))
             pad.fill(255)
-            img = cv2.resize(img, (int(1920 * 0.9), img.shsape[0]))
+            img = cv2.resize(img, (int(1920 * 0.9), img.shape[0]))
             pad[:img.shape[0], :img.shape[1], :] = img
             resized = pad
         else:
