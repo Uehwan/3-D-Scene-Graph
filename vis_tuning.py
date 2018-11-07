@@ -307,7 +307,35 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
             sg.edge('struct'+str(rel[0])+':'+str(rel[0]),
                     'struct'+str(rel[2])+':'+'-'+str(rel[2]),
                     str(test_set.predicate_classes[rel[1]]))
-    sg.render(osp.join(save_path,'scene_graph'+str(idx)), view=view)
+
+    if view and sg.format =='pdf':
+        sg.render(osp.join(save_path,'scene_graph'+str(idx)), view=view)
+    elif view and sg.format == 'png':
+        sg.render(osp.join(save_path, 'scene_graph' + str(idx)), view=False)
+        img = cv2.imread(osp.join(save_path, 'scene_graph' + str(idx)+'.png'),cv2.IMREAD_COLOR)
+        if img.shape[1]<int(1920*0.9) and img.shape[0]<int(1080*0.9):
+            pad = cv2.resize(img.copy(),(int(1920*0.9),int(1080*0.9)))
+            pad.fill(255)
+            pad[:img.shape[0], :img.shape[1], :] = img
+            resized = pad
+        elif img.shape[1]<int(1920*0.9):
+            pad = cv2.resize(img.copy(), (int(1920 * 0.9), int(1080 * 0.9)))
+            pad.fill(255)
+            img = cv2.resize(img, (img.shape[1], int(1080 * 0.9)))
+            pad[:img.shape[0], :img.shape[1], :] = img
+            resized = pad
+        elif img.shape[0]<int(1080*0.9):
+            pad = cv2.resize(img.copy(), (int(1920 * 0.9), int(1080 * 0.9)))
+            pad.fill(255)
+            img = cv2.resize(img, (int(1920 * 0.9), img.shsape[0]))
+            pad[:img.shape[0], :img.shape[1], :] = img
+            resized = pad
+        else:
+            resized = cv2.resize(img,(int(1920*0.9),int(1080*0.9)))
+        cv2.imshow('3D Scene Graph', resized)
+        cv2.moveWindow('3D Scene Graph',1920,0)
+        cv2.waitKey(1)
+
     node_feature.to_json(osp.join(save_path,'json','scene_graph_node'+str(idx)+'.json'), orient = 'index')
     relation.to_json(osp.join(save_path,'json','scene_graph_relation'+str(idx)+'.json'), orient = 'index')
     #sg.clear()
@@ -469,13 +497,14 @@ class scene_graph(object):
         except: pass
         self.disable_samenode = self.args.disable_samenode
         if self.disable_samenode: self.detect_cnt_thres=0
+        self.format = args.format
 
     def vis_scene_graph(self, image_scene, idx, test_set, obj_inds, obj_boxes, obj_scores,
                         subject_inds, predicate_inds, object_inds,
                         subject_IDs, object_IDs, triplet_scores,relationships,
                         pix_depth=None, inv_p_matrix=None, inv_R=None, Trans=None, dataset ='scannet'):
         updated_image_scene = image_scene.copy()
-        sg = Digraph('structs', node_attr = {'shape': 'plaintext'}) # initialize scene graph tool
+        sg = Digraph('structs', node_attr = {'shape': 'plaintext'},format=self.format) # initialize scene graph tool
         if dataset == 'scannet':   #scannet
             print('-ID--|----Object-----|Score|3D_position (x, y, z)|---var-------------|---color------')
         else:

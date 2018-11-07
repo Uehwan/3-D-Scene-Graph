@@ -113,3 +113,6 @@ eval/*.json
 pretrained_models/
 vis_result/
 *.pdf
+*.pkl
+.vector_cache
+data

@@ -81,7 +81,8 @@ def parse_args():
                         help='plot graph if true')
     parser.add_argument('--visualize', action='store_true',
                         help='enable visualization')
-
+    parser.add_argument('--format', type=str, default='png',
+                        help='scene graph image format, pdf or png')
     args = parser.parse_args()
 
     return args
