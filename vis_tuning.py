@@ -236,22 +236,17 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
         else:
             sg.attr('node', style="", color=box_color_hex)
             sg.node('struct'+str(node_feature.ix[node_num]["idx"]), '''<
-            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="2">
               <TR>
-                <TD PORT="'''+str(node_feature.ix[node_num]["idx"])+'''" ROWSPAN="2">'''+str(test_set.object_classes[node_feature.ix[node_num]["class"].argmax()])+'''</TD>
-                <TD COLSPAN="1">ID</TD>
-                <TD COLSPAN="2">color</TD>
-                <TD COLSPAN="3">3D Position</TD>
-                <TD PORT="'''+'-'+str(node_feature.ix[node_num]["idx"])+'''" ROWSPAN="2"> Rel </TD>
-                
+                <TD PORT="'''+str(node_feature.ix[node_num]["idx"])+'''" ROWSPAN="1">'''+str(test_set.object_classes[node_feature.ix[node_num]["class"].argmax()])+'''</TD>
+                <TD ROWSPAN="1">'''+str(node_feature.ix[node_num]["idx"])+'''</TD>
+                <TD COLSPAN="1">'''+str(node_feature.ix[node_num]["color_hist"][0][1])+'''</TD>
               </TR>
               <TR>
-                <TD>'''+str(node_feature.ix[node_num]["idx"])+'''</TD>
-                <TD>'''+str(node_feature.ix[node_num]["color_hist"][0][1])+'''</TD>
-                <TD>'''+str(node_feature.ix[node_num]["color_hist"][1][1])+'''</TD>
-                <TD>'''+str(node_feature.ix[node_num]["3d_pose"][0]) + '''</TD>
-                <TD>'''+str(node_feature.ix[node_num]["3d_pose"][1])+'''</TD>
-                <TD>'''+str(node_feature.ix[node_num]["3d_pose"][2])+'''</TD>
+                <TD PORT="'''+'-'+str(node_feature.ix[node_num]["idx"])+'''" ROWSPAN="2"> Rel </TD>  
+              </TR>
+              <TR>
+                <TD COLSPAN="2">('''+str(node_feature.ix[node_num]["3d_pose"][0]) + ''', '''+str(node_feature.ix[node_num]["3d_pose"][1])+''','''+str(node_feature.ix[node_num]["3d_pose"][2])+''')</TD>
               </TR>
             </TABLE>>''')
     tile_idx = set(tile_idx)
