@@ -13,4 +13,4 @@ mkdir data
 ln -s ./FactorizableNet/data/svg data/svg
 ln -s ./FactorizableNet/data/visual_genome data/visual_genome
 ln -s ./sort/mot_benchmark data/mot_benchmark
-
+pip install -r requirements.txt

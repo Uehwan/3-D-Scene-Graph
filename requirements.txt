@@ -1,3 +1,8 @@
 torchtext==0.2.3
 setuptools
 git+https://github.com/chickenbestlover/ColorHistogram.git
+pyyaml
+graphviz
+webcolors
+pandas
+matplotlib
