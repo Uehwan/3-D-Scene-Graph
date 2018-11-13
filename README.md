@@ -6,7 +6,7 @@
 * Python 2.7
 * Pytorch 0.3.1
 * FactorizableNet
-* TODO: write requirements in detail
+* TODO: write requirements in detail.
 
 ## Installation
 1. Download 3D-Scene-Graph repository 
