@@ -99,10 +99,8 @@ demo_mot.py
 
 
 # defined by yikang
-model/
 data/
 data
-model
 output
 output/
 log/
@@ -116,3 +114,4 @@ vis_result/
 *.pkl
 .vector_cache
 data
+*.json
