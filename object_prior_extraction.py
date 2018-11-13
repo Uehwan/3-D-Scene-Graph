@@ -30,7 +30,7 @@ print('After filtering: ' + str(len(relevant_classes)))
 ind2key = {idx: item for idx, item in enumerate(relevant_classes)}
 key2ind = {item: idx for idx, item in enumerate(relevant_classes)}
 
-file = open('relationships.json').read()
+file = open('prior/raw/relationships.json').read()
 
 data = json.loads(file)
 print("Reading JSON completed!!")
@@ -51,6 +51,6 @@ for datum in data:
             joint_probability[key2ind[obj], key2ind[sub]] += 1
             joint_probability[key2ind[sub], key2ind[obj]] += 1
 
-save_obj(joint_probability, "object_prior_prob")
-save_obj(ind2key, "object_prior_ind2key")
-save_obj(key2ind, "object_prior_key2ind")
+save_obj(joint_probability, "prior/preprocessed/object_prior_prob")
+save_obj(ind2key, "prior/preprocessed/object_prior_ind2key")
+save_obj(key2ind, "prior/preprocessed/object_prior_key2ind")

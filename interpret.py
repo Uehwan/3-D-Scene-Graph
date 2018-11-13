@@ -1,19 +1,15 @@
 import sys
 sys.path.append('./FactorizableNet')
-from models.HDN_v2.utils import interpret_relationships
 from lib.fast_rcnn.nms_wrapper import nms
-from lib import network
 from lib.fast_rcnn.bbox_transform import bbox_transform_inv_hdn, clip_boxes
-import lib.utils.logger as logger
 from lib.utils.nms import triplet_nms as triplet_nms_py
-from lib.utils.nms import unary_nms
 from sort.sort import Sort, iou
 import numpy as np
 from torch.autograd import Variable
 import torchtext
 import torch
-import prior
-from SGGenModel import VG_DR_NET_OBJ_IGNORES,VG_MSDN_OBJ_IGNORES
+from prior import relation_prior
+from SGGenModel import VG_DR_NET_OBJ_IGNORES
 from torch.nn.functional import cosine_similarity
 
 def filter_untracted(ref_bbox, tobefiltered_bbox):
@@ -61,8 +57,8 @@ class interpreter(object):
             self.tobefiltered_predicates = []
 
         # Params for Statistics Based Scene Graph Inference
-        self.relation_statistics = prior.load_obj("relation_prior_prob")
-        self.joint_probability = prior.load_obj("object_prior_prob")
+        self.relation_statistics = relation_prior.load_obj("prior/preprocessed/relation_prior_prob")
+        self.joint_probability = relation_prior.load_obj("prior/preprocessed/object_prior_prob")
         self.spurious_rel_thres = 0.07
         self.rel_infer_thres = 0.9
         self.obj_infer_thres = 0.001
@@ -134,7 +130,7 @@ class interpreter(object):
             distance = self.distance_between_boxes(np.stack([node1_box, node2_box], axis=0))[0, 1]
             pair_txt = [self.data_set.object_classes[obj_inds[pair[0]][0]],
                         self.data_set.object_classes[obj_inds[pair[1]][0]]]
-            candidate, prob, direction = prior.most_probable_relation_for_unpaired(pair_txt,self.relation_statistics,int(distance))
+            candidate, prob, direction = relation_prior.most_probable_relation_for_unpaired(pair_txt, self.relation_statistics, int(distance))
             if candidate !=None and prob > self.rel_infer_thres:
                 if not direction: pair = (pair[1],pair[0])
                 infered_relation.add((pair[0],pair[1],self.pred_stoi[candidate],prob))
@@ -225,7 +221,7 @@ class interpreter(object):
                             self.data_set.predicate_classes[pred_ind],
                             self.data_set.object_classes[obj_ind]]
             distance = self.distance_between_boxes(np.stack([sbj_box,obj_box],axis=0))[0,1]
-            prob = prior.triplet_prob_from_statistics(relation_txt,self.relation_statistics,int(distance))
+            prob = relation_prior.triplet_prob_from_statistics(relation_txt, self.relation_statistics, int(distance))
             print('prob: {prob:3.2f}     {sbj:15}{rel:15}{obj:15}'.format(prob=prob,
                                                                           sbj=relation_txt[0],
                                                                           rel=relation_txt[1],
