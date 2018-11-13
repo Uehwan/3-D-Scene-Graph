@@ -3,7 +3,6 @@ sys.path.append('./FactorizableNet')
 import random
 import numpy.random as npr
 import numpy as np
-import argparse
 import yaml
 from pprint import pprint
 import cv2
@@ -12,18 +11,13 @@ from torch.autograd import Variable
 from lib import network
 import lib.datasets as datasets
 import lib.utils.general_utils as utils
-import models as models
-from models.HDN_v2.utils import interpret_relationships
-import warnings
-from settings import parse_args, testImageLoader
+from model.settings import parse_args, testImageLoader
 from PIL import Image
-from sort.sort import Sort,iou
 import os.path as osp
 import os
-import interpret
-import vis_tuning
-from keyframe_extracion import keyframe_checker
-from SGGenModel import SGGen_MSDN, SGGen_DR_NET
+from model import interpret, vis_tuning
+from model.keyframe.keyframe_extracion import keyframe_checker
+from model.SGGenModel import SGGen_MSDN, SGGen_DR_NET
 args = parse_args()
 # Set the random seed
 random.seed(args.seed)
@@ -84,7 +78,7 @@ print('3D-Scene-Graph-Generator Demo: Object detection and Scene Graph Generatio
 print('--------------------------------------------------------------------------')
 imgLoader = testImageLoader(args)
 # Initial Sort tracker
-interpreter = interpret.interpreter(args,test_set,ENABLE_TRACKING=False)
+interpreter = interpret.interpreter(args, test_set, ENABLE_TRACKING=False)
 scene_graph = vis_tuning.scene_graph(args)
 keyframe_extractor = keyframe_checker(args,
                                       thresh_key=args.thres_key,
