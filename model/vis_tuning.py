@@ -24,7 +24,6 @@ _GREEN = (18, 127, 15)
 _WHITE = (255, 255, 255)
 
 
-
 def vis_bbox_opencv(img, bbox, color=_GREEN,thick=1):
     """Visualizes a bounding box."""
     (x0, y0, w, h) = bbox
@@ -190,6 +189,7 @@ def node_update(window_3d_pts, global_node, curr_mean, curr_var,  curr_cls, cls_
     except:
         return 0,0
 
+
 def Measure_new_Gaussian_distribution(new_pts):
     try:
         pt_num = len(new_pts)
@@ -202,8 +202,6 @@ def Measure_new_Gaussian_distribution(new_pts):
         return 1, [0,0,0], [1,1,1]
 
 
-
-
 def Measure_added_Gaussian_distribution(new_pts, prev_mean, prev_var, prev_pt_num, new_pt_num):
     # update mean and variance
     pt_num = prev_pt_num + new_pt_num
@@ -213,6 +211,7 @@ def Measure_added_Gaussian_distribution(new_pts, prev_mean, prev_var, prev_pt_nu
     var = np.subtract(np.divide((np.multiply((prev_var + np.power(prev_mean,2)),prev_pt_num) + np.sum(np.power(new_pts,2),axis=0)) ,pt_num), np.power(mean,2))
     var = [int(var[0]), int(var[1]), int(var[2])]
     return pt_num, mean, var
+
 
 def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, idx,cnt_thres=2,view=True,save_path='./vis_result/'):
     # load all of saved node_feature
@@ -346,6 +345,7 @@ def closest_colour(requested_colour):
         min_colours[(rd + gd + bd)] = name
     return min_colours[min(min_colours.keys())]
 
+
 def get_colour_name(requested_colour):
     try:
         closest_name = actual_name = webcolors.rgb_to_name(requested_colour)
@@ -353,6 +353,7 @@ def get_colour_name(requested_colour):
         closest_name = closest_colour(requested_colour)
         actual_name = None
     return actual_name, closest_name
+
 
 def get_color_hist(img):
     '''
@@ -411,7 +412,6 @@ def outlier_filter(points,mean_k=10,thres=1.0):
         return points
 
 
-
 def get_color_hist2(img):
     '''
     # return color_hist
@@ -441,6 +441,7 @@ def get_color_hist2(img):
 
     return color_hist
 
+
 def make_window_size(width, height, obj_boxes):
     if( width<30):
         range_x_min = int(obj_boxes[0]) + int(width*2./10.) 
@@ -464,7 +465,9 @@ def make_window_size(width, height, obj_boxes):
 
     return range_x_min, range_x_max, range_y_min, range_y_max
 
+
 colorlist = [(random.randint(0,230),random.randint(0,230),random.randint(0,230)) for i in range(10000)]
+
 
 class scene_graph(object):
     def __init__(self,args):
@@ -520,7 +523,6 @@ class scene_graph(object):
                                 int(obj_boxes[i][0]):int(obj_boxes[i][2])]
                 color_hist = get_color_hist2(box_whole_img)
 
-
                 '''2. Get Center Patch '''
                 # Define bounding box info
                 width = int(obj_boxes[i][2]) - int(obj_boxes[i][0])
@@ -532,11 +534,6 @@ class scene_graph(object):
                 range_x_min, range_x_max, range_y_min, range_y_max = make_window_size(width, height, obj_boxes[i])
                 # Crop center patch
                 box_center_img = image_scene[range_y_min:range_y_max, range_x_min:range_x_max]
-
-
-
-
-
 
                 '''3. Get 3D positions of the Centor Patch'''
                 window_3d_pts = []
@@ -561,7 +558,6 @@ class scene_graph(object):
                 #             # save several points in window_box to calculate mean and variance
                 #             window_3d_pts.append([pose_3d_world_coord_window.item(0), pose_3d_world_coord_window.item(1), pose_3d_world_coord_window.item(2)])
 
-
                 window_3d_pts = outlier_filter(window_3d_pts)
 
                 #window_3d_pts = np.array(window_3d_pts,dtype=np.float32)
@@ -585,10 +581,6 @@ class scene_graph(object):
                 #     plt.hold(True)
                 # cv2.waitKey(0)
 
-
-
-
-
                 '''4. Get a 3D position of the Center Patch's Center point'''
                 # find 3D point of the bounding box(the center patch)'s center
                 curr_pt_num, curr_mean, curr_var = Measure_new_Gaussian_distribution(window_3d_pts)
@@ -604,7 +596,6 @@ class scene_graph(object):
                 cls_scores = np.zeros(400)
                 for cls_idx, cls_score in zip(obj_ind, obj_scores[i]):
                     cls_scores[cls_idx] += cls_score  # check
-
 
                 '''5. Save Object Recognition Results in DataFrame Format'''
                 if(self.img_count ==0):
@@ -669,7 +660,6 @@ class scene_graph(object):
 
                 # if object index was changed, update relation's object index also
 
-
                 '''6. Print object info'''
                 print('{obj_ID:5} {obj_cls:15}  {obj_score:4.2f} {object_3d_pose:20}    {obj_var:20} {obj_color:15}'
                           .format(obj_ID= box_id, 
@@ -678,7 +668,6 @@ class scene_graph(object):
                                   object_3d_pose= [self.mean[0], self.mean[1], self.mean[2]],
                                   obj_var= self.var,
                                   obj_color = color_hist[0][1] ))
-
 
             else:   # TODO: for visual_genome
                 raise NotImplementedError
@@ -705,7 +694,6 @@ class scene_graph(object):
                         font_scale,
                         (255,255,255),
                         1)
-
         # add ID per bbox
 
         rel_prev_num = len(self.rel_data)

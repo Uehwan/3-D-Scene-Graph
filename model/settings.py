@@ -9,6 +9,7 @@ import cv2
 import yaml
 import lib.utils.general_utils as utils
 
+
 def parse_args():
     parser = argparse.ArgumentParser('Options for Running 3D-Scene-Graph-Generator in pytorch')
 
@@ -33,8 +34,6 @@ def parse_args():
     # testing settings
     parser.add_argument('--use_gt_boxes', action='store_true', help='Use ground truth bounding boxes for evaluation')
 
-
-
     '''Demo Settings in 3D-Scene-Graph'''
     # Data loader Settings
     parser.add_argument('--dataset' ,type=str, default='scannet',
@@ -56,7 +55,6 @@ def parse_args():
                         help=' ')
     parser.add_argument('--max_group_len', type=float, default=10,
                         help=' ')
-
     parser.add_argument('--alpha', type=float, default=0.4,
                         help='weight for Exponentially Weighted Summation')
     parser.add_argument('--gain', type=float, default=25,
@@ -124,7 +122,6 @@ class testImageLoader(object):
         self.num_frames = len(os.listdir(self.img_folder_path))
 
     def load_image(self,frame_idx):
-
         if self.args.dataset == 'scannet':
             # Load an image from ScanNet Dataset
             img_path = osp.join(self.img_folder_path, str(frame_idx+1) + '.jpg')

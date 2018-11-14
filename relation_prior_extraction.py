@@ -82,8 +82,6 @@ if __name__=="__main__":
     save_obj(pred_key2ind,filename='model/prior/preprocessed/pred_prior_key2ind.pkl')
     print('After PREDICATE filtering: ' + str(len(pred_cls)))
 
-
-
     '''1. start constructing relation prior'''
     extract_statistics = True
     if extract_statistics:
@@ -121,9 +119,6 @@ if __name__=="__main__":
                 else:
                     predicates[pred] = 1
         save_obj(statistics, "model/prior/preprocessed/relation_prior")
-
-
-
 
     '''2. processing relation prior'''
     statistics = load_obj("model/prior/preprocessed/relation_prior")

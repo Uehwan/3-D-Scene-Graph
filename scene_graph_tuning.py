@@ -18,6 +18,8 @@ import os
 from model import interpret, vis_tuning
 from model.keyframe.keyframe_extracion import keyframe_checker
 from model.SGGenModel import SGGen_MSDN, SGGen_DR_NET
+
+
 args = parse_args()
 # Set the random seed
 random.seed(args.seed)
@@ -102,7 +104,6 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
         depth_img, pix_depth, inv_p_matrix, inv_R, Trans, camera_pose = None, None, None, None, None, None
     img_original_shape = image_scene.shape
 
-
     ''' 3. Pre-processing: Rescale & Normalization '''
     # Resize the image to target scale
     if args.dataset == 'scannet':
@@ -115,7 +116,6 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
     im_data = Image.fromarray(im_data)
     im_data = test_set.transform(im_data) # normalize the image with the pre-defined min/std.
     im_data = Variable(im_data.cuda(), volatile=True).unsqueeze(0)
-
 
     ''' 2. Key-frame Extraction: Check if this frame is key-frame or anchor-frame'''
     IS_KEY_OR_ANCHOR, sharp_score, sharp_thres = keyframe_extractor.check_frame(image_scene, depth_img, camera_pose)
@@ -141,7 +141,6 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
 
     ''' 3. Object Detection & Scene Graph Generation from the Pre-trained MSDN Model '''
     object_result, predicate_result = model.forward_eval(im_data, im_info, )
-
 
     ''' 4. Post-processing: Interpret the Model Output '''
     # interpret the model output
@@ -199,14 +198,3 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
 
     if args.visualize:
         cv2.waitKey(args.pause_time)
-
-
-
-
-
-
-
-
-
-
-

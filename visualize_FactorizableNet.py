@@ -15,6 +15,7 @@ import models as models
 from models.HDN_v2.utils import interpret_relationships
 import warnings
 
+
 parser = argparse.ArgumentParser('Options for training Hierarchical Descriptive Model in pytorch')
 
 parser.add_argument('--path_opt', default='options/models/VG-DR-Net.yaml', type=str,
@@ -70,7 +71,6 @@ def vis_object_detection(image_scene, test_set,
 
 
 if __name__ == '__main__':
-
     # Set options
     options = {
         'data':{
@@ -110,7 +110,6 @@ if __name__ == '__main__':
                                                 pin_memory=True,
                                                 collate_fn=getattr(datasets, options['data']['dataset']).collate)
 
-
     network.set_trainable(model, False)
     print('Loading pretrained model: {}'.format(args.pretrained_model))
     args.train_all = True
@@ -118,7 +117,6 @@ if __name__ == '__main__':
     # Setting the state of the training model
     model.cuda()
     model.eval()
-
 
     for i, sample in enumerate(test_loader): # (im_data, im_info, gt_objects, gt_relationships)
         if i < 500: continue
@@ -166,9 +164,6 @@ if __name__ == '__main__':
             continue
         cutline_idx = max(keep_rel)
         relationships = relationships[:cutline_idx+1]
-
-
-
 
         print('-------Subject-------|------Predicate-----|--------Object---------|--Score-')
         for relation in relationships:
