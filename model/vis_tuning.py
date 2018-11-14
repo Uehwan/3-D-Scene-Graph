@@ -220,35 +220,61 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
     #print('node_feature:',node_feature)
     tile_idx = []
     handle_idx = []
+    tomato_rgb = [255,99,71]
+    tomato_hex = webcolors.rgb_to_hex(tomato_rgb)
     for node_num in range(len(node_feature)):
         if node_feature.ix[node_num]['detection_cnt'] < cnt_thres: continue
         if len(node_feature.ix[node_num]["color_hist"]) ==1:
             node_feature.at[node_num,"color_hist"].append(node_feature.ix[node_num]["color_hist"][0])
-        box_color_bgr = colorlist[int(node_feature.ix[node_num]["idx"])]
-        box_color_rgb = box_color_bgr[::-1]
+        #box_color_bgr = colorlist[int(node_feature.ix[node_num]["idx"])]
+        #box_color_rgb = box_color_bgr[::-1]
         box_color_rgb = webcolors.name_to_rgb(node_feature.ix[node_num]["color_hist"][0][1])
         box_color_hex = webcolors.rgb_to_hex(box_color_rgb)
+        box_color_hex_opp = webcolors.rgb_to_hex(np.subtract([255,255,255],box_color_rgb))
+        print(box_color_hex)
+        print(box_color_hex_opp)
         obj_cls =  str(test_set.object_classes[node_feature.ix[node_num]["class"].argmax()])
+        node = node_feature.ix[node_num]
         if ( obj_cls == "tile"):
-            tile_idx.append(str(node_feature.ix[node_num]["idx"]))
+            tile_idx.append(str(node["idx"]))
         elif (obj_cls == "handle"):
-            handle_idx.append(str(node_feature.ix[node_num]["idx"]))
+            handle_idx.append(str(node["idx"]))
         else:
-            sg.attr('node', style="", color=box_color_hex)
-            sg.node('struct'+str(node_feature.ix[node_num]["idx"]), '''<
-            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="2">
-              <TR>
-                <TD PORT="'''+str(node_feature.ix[node_num]["idx"])+'''" ROWSPAN="1">'''+str(test_set.object_classes[node_feature.ix[node_num]["class"].argmax()])+'''</TD>
-                <TD ROWSPAN="1">'''+str(node_feature.ix[node_num]["idx"])+'''</TD>
-                <TD COLSPAN="1">'''+str(node_feature.ix[node_num]["color_hist"][0][1])+'''</TD>
-              </TR>
-              <TR>
-                <TD PORT="'''+'-'+str(node_feature.ix[node_num]["idx"])+'''" ROWSPAN="2"> Rel </TD>  
-              </TR>
-              <TR>
-                <TD COLSPAN="2">('''+str(node_feature.ix[node_num]["3d_pose"][0]) + ''', '''+str(node_feature.ix[node_num]["3d_pose"][1])+''','''+str(node_feature.ix[node_num]["3d_pose"][2])+''')</TD>
-              </TR>
-            </TABLE>>''')
+            sg.node('struct'+str(node["idx"]), shape='box', style='filled,rounded',
+                label= obj_cls+
+                "_"+str(node["idx"])+"\n"+
+                "("+str(node["3d_pose"][0])+","+
+                    str(node["3d_pose"][1])+","+
+                    str(node["3d_pose"][2])+ ")",
+                fillcolor= tomato_hex, fontcolor = 'black')
+            '''
+            # Apply color to scene graph node
+            # Works for later
+            print(get_colour_name(box_color_rgb)[1])
+            color_name = get_colour_name(box_color_rgb)[1]
+            if ( color_name == 'grey' or  color_name == 'dimgrey' or color_name == 'darkslategray' or color_name == 'darkgray' or color_name == 'lightgray'):
+                print("gray color found")
+                sg.node('struct'+str(node["idx"]), shape='box', style='filled,rounded',
+                    label= obj_cls+
+                    "_"+str(node["idx"])+"\n"+
+                    "("+str(node["3d_pose"][0])+","+
+                        str(node["3d_pose"][1])+","+
+                        str(node["3d_pose"][2])+ ")",
+                    fillcolor= str(box_color_hex), fontcolor = 'white')
+                 
+            else:
+                sg.node('struct'+str(node["idx"]), shape='box', style='filled,rounded',
+                    label= obj_cls+
+                    "_"+str(node["idx"])+"\n"+
+                    "("+str(node["3d_pose"][0])+","+
+                        str(node["3d_pose"][1])+","+
+                        str(node["3d_pose"][2])+ ")",
+                    fillcolor= str(box_color_hex), fontcolor = str(box_color_hex_opp))
+
+            #sg.node('color'+str(node["idx"]), shape= 'circle', style= 'filled',
+            #         fillcolor = str(box_color_hex),fontcolor=str(box_color_hex_opp), label='.')
+            #sg.edge('struct'+str(node["idx"]), 'color'+str(node["idx"])) 
+            '''
     tile_idx = set(tile_idx)
     tile_idx = list(tile_idx)
     handle_idx = set(handle_idx)
@@ -288,6 +314,8 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
         relation_set = set(relation_set)
         #print(len(relation_set))
 
+    pale_rgb = [152,251,152]
+    pale_hex = webcolors.rgb_to_hex(pale_rgb)
     for rel_num in range(len(relation_set)):
         rel = relation_set.pop()
         tile = False
@@ -299,9 +327,11 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
             if (str(rel[0]) == h_i or str(rel[2]) == h_i):
                 handle = True
         if ( (not tile) and (not handle)):
-            sg.edge('struct'+str(rel[0])+':'+str(rel[0]),
-                    'struct'+str(rel[2])+':'+'-'+str(rel[2]),
-                    str(test_set.predicate_classes[rel[1]]))
+            sg.node('rel'+str(rel_num), shape= 'box', style= 'filled, rounded', fillcolor= pale_hex, fontcolor= 'black',
+                    label= str(test_set.predicate_classes[rel[1]]))
+            sg.edge('struct'+str(rel[0]), 'rel'+str(rel_num))
+            sg.edge('rel'+str(rel_num), 'struct'+str(rel[2]))
+
 
     if view and sg.format =='pdf':
         sg.render(osp.join(save_path,'scene_graph'+str(idx)), view=view)
@@ -499,7 +529,7 @@ class scene_graph(object):
                         subject_IDs, object_IDs, triplet_scores,relationships,
                         pix_depth=None, inv_p_matrix=None, inv_R=None, Trans=None, dataset ='scannet'):
         updated_image_scene = image_scene.copy()
-        sg = Digraph('structs', node_attr = {'shape': 'plaintext'},format=self.format) # initialize scene graph tool
+        sg = Digraph('structs', format=self.format) # initialize scene graph tool
         if dataset == 'scannet':   #scannet
             print('-ID--|----Object-----|Score|3D_position (x, y, z)|---var-------------|---color------')
         else:
