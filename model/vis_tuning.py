@@ -32,6 +32,7 @@ def vis_bbox_opencv(img, bbox, color=_GREEN,thick=1):
     cv2.rectangle(img, (x0, y0), (x1, y1), color, thickness=thick)
     return img
 
+
 def get_class_string(class_index, score, dataset):
     class_text = dataset[class_index] if dataset is not None else \
         'id{:d}'.format(class_index)
@@ -75,6 +76,7 @@ def compare_class(curr_cls, prev_cls, cls_score,compare_all=False):
 
     return score
 
+
 def compare_position(curr_mean, curr_var, prev_mean, prev_var, prev_pt_num, new_pt_num):
     I_x, I_y, I_z = check_distance(curr_mean,curr_var, prev_mean, prev_var) 
     #score = (I_x * I_y * I_z)
@@ -82,13 +84,15 @@ def compare_position(curr_mean, curr_var, prev_mean, prev_var, prev_pt_num, new_
     score = float(score)
     return score
 
+
 def compare_color(curr_hist, prev_hist):
     curr_rgb = webcolors.name_to_rgb(curr_hist[0][1])
     prev_rgb = webcolors.name_to_rgb(prev_hist[0][1])
     dist = np.sqrt(np.sum(np.power(np.subtract(curr_rgb, prev_rgb),2))) / (255*np.sqrt(3))
     score = 1-dist
     return score
-     
+
+
 def check_distance(x,curr_var, mean, var):
     Z_x = (x[0]-mean[0])/1000.
     Z_y = (x[1]-mean[1])/1000.

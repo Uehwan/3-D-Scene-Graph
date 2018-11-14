@@ -87,6 +87,13 @@ def parse_args():
 
 
 class testImageLoader(object):
+    """
+    Description
+        - Loads images for test
+        - Specify which dataset to use for test
+    Functions
+        - load_image: loads one image of given frame id
+    """
     def __init__(self,args):
         self.args = args
         self.mot_benchmark_train = ['ADL-Rundle-6', 'ADL-Rundle-8','ETH-Bahnhof','ETH-Pedcross2','ETH-Sunnyday',

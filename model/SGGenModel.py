@@ -60,6 +60,13 @@ objects_ignored (VG-MSDN)
 
 
 class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
+    """
+    Description
+        - Detect and recognize objects with relations
+        - DR_net extends factorizable network
+    Functions
+        - forward_eval: generate detection & recognition results for the given image
+    """
     def __init__(self,args, trainset, opts,
                  ):
         super(SGGen_DR_NET,self).__init__(trainset,opts)
@@ -120,12 +127,18 @@ class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
         else:
             reranked_score = None
 
-
         return (cls_prob_object, bbox_object, object_rois, reranked_score), \
                 (cls_prob_predicate, mat_phrase, region_rois.size(0)),
 
 
 class SGGen_MSDN(models.HDN_v2.factorizable_network_v4.Factorizable_network):
+    """
+    Description
+        - Detect and recognize objects with relations
+        - MSDN extends factorizable network
+    Functions
+        - forward_eval: generate detection & recognition results for the given image
+    """
     def __init__(self,args, trainset, opts,
                  ):
         super(SGGen_MSDN,self).__init__(trainset,opts)
