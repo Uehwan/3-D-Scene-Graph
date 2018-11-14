@@ -49,16 +49,12 @@ def compare_class(curr_cls, prev_cls, cls_score,compare_all=False):
             same_cls += 1
 
     if (similar_cls):
-        #score = float(same_cls) * cls_score
         if (same_cls == 3):
             score = 1.0
         if (same_cls == 2):
             score = 0.9
         if (same_cls == 1):
             score = 0.8
-
-    # max similarity = 1 (same word), min similarity = 0 (no relation)
-    # similarity = cosine_similarity(fasttext.vectors[fasttext.stoi['hello']],fasttext.vectors[fasttext.stoi['hi']],dim=0)
     else:
         if compare_all:
             similarity = 0
@@ -66,12 +62,9 @@ def compare_class(curr_cls, prev_cls, cls_score,compare_all=False):
                 for j in range(3):
                     similarity += cosine_similarity(fasttext.vectors[fasttext.stoi[curr_cls[i]]].cuda(),fasttext.vectors[fasttext.stoi[prev_cls[j]]].cuda(),dim=0).cpu()[0]
             similarity /= 9.0
-        #print(similarity)
         else:
             similarity = cosine_similarity(fasttext.vectors[fasttext.stoi[curr_cls[0]]].cuda(),
                                         fasttext.vectors[fasttext.stoi[prev_cls[0]]].cuda(), dim=0).cpu()[0]
-
-        #score = similarity * cls_score
         score = 0.
 
     return score
@@ -79,7 +72,6 @@ def compare_class(curr_cls, prev_cls, cls_score,compare_all=False):
 
 def compare_position(curr_mean, curr_var, prev_mean, prev_var, prev_pt_num, new_pt_num):
     I_x, I_y, I_z = check_distance(curr_mean,curr_var, prev_mean, prev_var) 
-    #score = (I_x * I_y * I_z)
     score = (I_x/3.0) + (I_y/3.0) + (I_z/3.0)
     score = float(score)
     return score
@@ -97,25 +89,9 @@ def check_distance(x,curr_var, mean, var):
     Z_x = (x[0]-mean[0])/1000.
     Z_y = (x[1]-mean[1])/1000.
     Z_z = (x[2]-mean[2])/1000.
-    #Z_x = (x[0]-mean[0])/np.sqrt(curr_var[0])
-    #Z_y = (x[1]-mean[1])/np.sqrt(curr_var[1])
-    #Z_z = (x[2]-mean[2])/np.sqrt(curr_var[2])
-    # In Standardized normal gaussian distribution
-    # Threshold : 0.9 --> -1.65 < Z < 1.65
-    #           : 0.8 --> -1.29 < Z < 1.29
-    #           : 0.7 --> -1.04 < Z < 1.04
-    #           : 0.6 --> -0.845 < Z < 0.845
-    #           : 0.5 --> -0.675 < Z < 0.675
-    #           : 0.4 --> -0.53 < Z < 0.53
-    #print("    pos {pos_x:3.2f} {pose_y:3.2f} {pose_z:3.2f}".format(pos_x=Z_x, pose_y=Z_y, pose_z=Z_z))
-    #print("pos_y {pos_y:3.2f}".format(pos_y=Z_y))
-    #print("pos_z {pos_z:3.2f}".format(pos_z=Z_z))
     th_x = 0.9
     th_y = 0.9
     th_z = 0.9
-    #th_x = np.sqrt(np.abs(var[0])) *beta
-    #th_y = np.sqrt(np.abs(var[1])) *beta
-    #th_z = np.sqrt(np.abs(var[2])) *beta
     x_check = -th_x < Z_x < th_x
     y_check = -th_y < Z_y < th_y
     z_check = -th_z < Z_z < th_z
@@ -123,38 +99,17 @@ def check_distance(x,curr_var, mean, var):
     if (x_check):
         I_x = 1.0
     else:
-        #I_x = norm.cdf(-np.abs(Z_x)) / norm.cdf(-th_x)
-        #I_x = (norm.cdf(th_x) - norm.cdf(-th_x)) / (norm.cdf(np.abs(Z_x)) - norm.cdf(-np.abs(Z_x)))
         I_x = th_x / np.abs(Z_x)
-        # if (np.abs(th_x - Z_x)<1):
-        #     I_x = np.abs(th_x - Z_x)
-        # else:
-        #     I_x = 1/np.abs(th_x-Z_x)
+
     if (y_check):
         I_y = 1.0
     else:
-        #I_y = norm.cdf(-np.abs(Z_y)) / norm.cdf(-th_y)
-        #I_y = (norm.cdf(th_y) - norm.cdf(-th_y)) / (norm.cdf(np.abs(Z_y)) - norm.cdf(-np.abs(Z_y)))
         I_y = th_y / np.abs(Z_y)
-        # if (np.abs(th_y - Z_y)<1):
-        #     I_y = np.abs(th_y - Z_y)
-        # else:
-        #     I_y = 1/np.abs(th_y-Z_y)
+
     if (z_check):
         I_z = 1.0
     else:
-        #I_z = norm.cdf(-np.abs(Z_z)) / norm.cdf(-th_z)
-        #I_z = (norm.cdf(th_z) - norm.cdf(-th_z)) / (norm.cdf(np.abs(Z_z)) - norm.cdf(-np.abs(Z_z)))
         I_z = th_z / np.abs(Z_z)
-        # if (np.abs(th_z - Z_z)<1):
-        #     I_z = np.abs(th_z - Z_z)
-        # else:
-        #     I_z = 1/np.abs(th_x-Z_z)
-    
-    #print("    score {score_x:3.2f} {score_y:3.2f} {score_z:3.2f}".format(score_x=I_x, score_y=I_y, score_z=I_z))
-    #print("    tot_score {score:3.2f} ".format(score=(I_x+I_y+I_z)/3.))
-    #print("pose_score_y {pos_score_y:3.2f}".format(pos_score_y=I_y))
-    #print("pose_score_z {pos_score_z:3.2f}".format(pos_score_z=I_z))
     return I_x, I_y, I_z
 
 
@@ -167,29 +122,21 @@ def node_update(window_3d_pts, global_node, curr_mean, curr_var,  curr_cls, cls_
         score_pose = []
         cls_score = cls_score[0]
         w1, w2, w3 = 10.0/20.0, 8.0/20.0, 2.0/20.0
-        #print("current object : {cls:3}".format(cls=curr_cls[0]))
         for i in range(global_node_num):
             prev_cls = (-global_node.ix[i]["class"]).argsort()[:3] # choose top 3 index
             prev_cls =  [test_set.object_classes[ind] for ind in prev_cls] # index to text
-            #print("compare object : {comp_cls:3}".format(comp_cls=prev_cls[0]))
             prev_mean, prev_var, prev_pt_num = global_node.ix[i]["mean"], global_node.ix[i]["var"], global_node.ix[i]["pt_num"]
             prev_color_hist = global_node.ix[i]["color_hist"]
             cls_sc = compare_class(curr_cls, prev_cls, cls_score)
             pos_sc = compare_position(curr_mean,curr_var, prev_mean, prev_var, prev_pt_num, new_pt_num)
             col_sc = compare_color(curr_color_hist, prev_color_hist)
-            #print("class_score {cls_score:3.2f}".format(cls_score=cls_sc))
-            #print("pose_score {pos_score:3.2f}".format(pos_score=pos_sc))
-            #print("color_score {col_score:3.2f}".format(col_score=col_sc))
             tot_sc = (w1 * cls_sc) + (w2 * pos_sc) + (w3 * col_sc)
-            #print("total_score {tot_score:3.2f}".format(tot_score=tot_sc))
             score.append(tot_sc)
-            #score_pose.append(pos_sc)
         node_score = max(score)
         print("node_score {score:3.4f}".format(score=node_score))
         max_score_index = score.index(max(score))
-        #node_score_pose = score_pose[max_score_index]
-        #print("node_score_pose {score_pose:3.2f}".format(score_pose=node_score_pose))
         return node_score, max_score_index
+
     except:
         return 0,0
 
@@ -220,7 +167,6 @@ def Measure_added_Gaussian_distribution(new_pts, prev_mean, prev_var, prev_pt_nu
 def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, idx,cnt_thres=2,view=True,save_path='./vis_result/'):
     # load all of saved node_feature
     # if struct ids are same, updated to newly typed object
-    #print('node_feature:',node_feature)
     tile_idx = []
     handle_idx = []
     tomato_rgb = [255,99,71]
@@ -229,8 +175,6 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
         if node_feature.ix[node_num]['detection_cnt'] < cnt_thres: continue
         if len(node_feature.ix[node_num]["color_hist"]) ==1:
             node_feature.at[node_num,"color_hist"].append(node_feature.ix[node_num]["color_hist"][0])
-        #box_color_bgr = colorlist[int(node_feature.ix[node_num]["idx"])]
-        #box_color_rgb = box_color_bgr[::-1]
         box_color_rgb = webcolors.name_to_rgb(node_feature.ix[node_num]["color_hist"][0][1])
         box_color_hex = webcolors.rgb_to_hex(box_color_rgb)
         box_color_hex_opp = webcolors.rgb_to_hex(np.subtract([255,255,255],box_color_rgb))
@@ -250,34 +194,6 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
                     str(node["3d_pose"][1])+","+
                     str(node["3d_pose"][2])+ ")",
                 fillcolor= tomato_hex, fontcolor = 'black')
-            '''
-            # Apply color to scene graph node
-            # Works for later
-            print(get_colour_name(box_color_rgb)[1])
-            color_name = get_colour_name(box_color_rgb)[1]
-            if ( color_name == 'grey' or  color_name == 'dimgrey' or color_name == 'darkslategray' or color_name == 'darkgray' or color_name == 'lightgray'):
-                print("gray color found")
-                sg.node('struct'+str(node["idx"]), shape='box', style='filled,rounded',
-                    label= obj_cls+
-                    "_"+str(node["idx"])+"\n"+
-                    "("+str(node["3d_pose"][0])+","+
-                        str(node["3d_pose"][1])+","+
-                        str(node["3d_pose"][2])+ ")",
-                    fillcolor= str(box_color_hex), fontcolor = 'white')
-                 
-            else:
-                sg.node('struct'+str(node["idx"]), shape='box', style='filled,rounded',
-                    label= obj_cls+
-                    "_"+str(node["idx"])+"\n"+
-                    "("+str(node["3d_pose"][0])+","+
-                        str(node["3d_pose"][1])+","+
-                        str(node["3d_pose"][2])+ ")",
-                    fillcolor= str(box_color_hex), fontcolor = str(box_color_hex_opp))
-
-            #sg.node('color'+str(node["idx"]), shape= 'circle', style= 'filled',
-            #         fillcolor = str(box_color_hex),fontcolor=str(box_color_hex_opp), label='.')
-            #sg.edge('struct'+str(node["idx"]), 'color'+str(node["idx"])) 
-            '''
     tile_idx = set(tile_idx)
     tile_idx = list(tile_idx)
     handle_idx = set(handle_idx)
@@ -310,12 +226,10 @@ def Draw_connected_scene_graph(node_feature, relation, img_count, test_set, sg, 
             preds = [t[1] for t in triplets]
             counted = Counter(preds)
             voted_pred = counted.most_common(1)
-            #print(i, idx, triplets, voted_pred)
             relation_array[pos, 1] = voted_pred[0][0]
 
         relation_set =[tuple(rel)for rel in relation_array.astype(int).tolist()]
         relation_set = set(relation_set)
-        #print(len(relation_set))
 
     pale_rgb = [152,251,152]
     pale_hex = webcolors.rgb_to_hex(pale_rgb)
@@ -454,11 +368,7 @@ def get_color_hist2(img):
     '''
     try:
         hist3D = Hist3D(img[..., ::-1], num_bins=8, color_space='rgb')# BGR to RGB
-        # print('sffsd:', img.shape)
-        # cv2.imshow('a',img)
-        # cv2.waitKey(1)
     except:
-
         return get_color_hist(img)
     else:
         densities = hist3D.colorDensities()
@@ -505,9 +415,6 @@ colorlist = [(random.randint(0,230),random.randint(0,230),random.randint(0,230))
 
 class scene_graph(object):
     def __init__(self,args):
-        #self.data = DataFrame({"node_feature":[]}, index=[])
-        # [class, index, score, bounding_box, 3d_pose, mean, var, pt_number, color]
-        
         self.data = DataFrame({"class":[np.zeros(400)], "idx":0, "score":[np.zeros(400)], #check
                                 "bounding_box":[[0,0,0,0]], "3d_pose":[[0,0,0]], "mean":[[0,0,0]],
                                 "var":[[0,0,0]], "pt_num":0, "color_hist":[[[0,"red"],[0,"blue"]]], "detection_cnt:":0},
@@ -581,39 +488,7 @@ class scene_graph(object):
                             window_3d_pts.append([pose_3d_world_coord_window.item(0), pose_3d_world_coord_window.item(1), pose_3d_world_coord_window.item(2)])
                 # window_3d_pts
                 # ex: [[X_1,Y_1,Z_1],[X_2,Y_2,Z_2],...,[X_N,Y_N,Z_N]]
-
-                # window_3d_pts = []
-                # for pt_x in range(int(obj_boxes[i][0]), int(obj_boxes[i][2])):
-                #     for pt_y in range(int(obj_boxes[i][1]), int(obj_boxes[i][3])):
-                #         pose_2d_window = np.matrix([pt_x, pt_y, 1])
-                #         pose_3d_window = pix_depth[pt_x][pt_y] * np.matmul(inv_p_matrix, pose_2d_window.transpose())
-                #         pose_3d_world_coord_window = np.matmul(inv_R, pose_3d_window[0:3] - Trans.transpose())
-                #         if not isNoisyPoint(pose_3d_world_coord_window):
-                #             # save several points in window_box to calculate mean and variance
-                #             window_3d_pts.append([pose_3d_world_coord_window.item(0), pose_3d_world_coord_window.item(1), pose_3d_world_coord_window.item(2)])
-
                 window_3d_pts = outlier_filter(window_3d_pts)
-
-                #window_3d_pts = np.array(window_3d_pts,dtype=np.float32)
-                #cloud = pcl.PointCloud()
-                #cloud.from_array(window_3d_pts)
-                #outlier_filter = cloud.make_statistical_outlier_filter()
-                #outlier_filter.set_mean_k(min(len(window_3d_pts),10))
-                #outlier_filter.set_std_dev_mul_thresh(1.0)
-                #cloud_filtered = outlier_filter.filter()
-                #window_3d_pts = cloud_filtered.to_array().tolist()
-
-                # arr = np.array(window_3d_pts,dtype=np.float).reshape(-1,3)
-                # if arr.size>0:
-                #     ax.scatter(-arr[:,0],-arr[:,1],-arr[:,2],)
-                #     #ax.set_xlim(-2000, 2000)
-                #     #ax.set_ylim(-2000, 2000)
-                #     #ax.set_zlim(-2000, 2000)
-                #
-                #     self.fig.show()
-                #     plt.pause(0.01)
-                #     plt.hold(True)
-                # cv2.waitKey(0)
 
                 '''4. Get a 3D position of the Center Patch's Center point'''
                 # find 3D point of the bounding box(the center patch)'s center
@@ -624,9 +499,7 @@ class scene_graph(object):
                 box_cls = [test_set.object_classes[obj_ind[0]], 
                            test_set.object_classes[obj_ind[1]],
                            test_set.object_classes[obj_ind[2]]]
-                # box_cls: ['pillow','bag','cat']
                 box_score = obj_scores[i]
-                # box_score: [0.2,0.1,0.01]
                 cls_scores = np.zeros(400)
                 for cls_idx, cls_score in zip(obj_ind, obj_scores[i]):
                     cls_scores[cls_idx] += cls_score  # check
@@ -666,7 +539,6 @@ class scene_graph(object):
                         for cls_idx,cls_score in zip(obj_ind,obj_scores[i]):
                             self.data.at[max_score_index,'class'][cls_idx]+= cls_score # check
 
-                        #self.data.at[max_score_index, "class"] = box_cls
                         self.data.at[max_score_index, "score"] = node_score
                         self.pt_num, self.mean, self.var = Measure_added_Gaussian_distribution(window_3d_pts,
                                                                                 self.data.ix[max_score_index]["mean"],
@@ -693,7 +565,6 @@ class scene_graph(object):
                         self.data.loc[len(self.data)] = add_node_list
 
                 # if object index was changed, update relation's object index also
-
                 '''6. Print object info'''
                 print('{obj_ID:5} {obj_cls:15}  {obj_score:4.2f} {object_3d_pose:20}    {obj_var:20} {obj_color:15}'
                           .format(obj_ID= box_id, 
@@ -757,7 +628,6 @@ class scene_graph(object):
         if ( rel_prev_num != rel_new_num): 
             Draw_connected_scene_graph(self.data, self.rel_data, self.img_count, test_set, sg, idx,
                                        self.detect_cnt_thres,self.args.plot_graph,self.save_path)
-        #sg.view()
 
         # it's help to select starting point of first image manually
         self.img_count+=1

@@ -115,11 +115,9 @@ class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
         cls_score_object = self.score_obj(pooled_object_features)
         cls_score_object.data.masked_fill_(self.objects_mask, -float('inf'))
         cls_prob_object = F.softmax(cls_score_object, dim=1)
-        #print(cls_score_object,cls_score_object.shape)
         cls_score_predicate = self.score_pred(pooled_phrase_features)
         cls_score_predicate.data.masked_fill_(self.predicates_mask, -float('inf'))
         cls_prob_predicate = F.softmax(cls_score_predicate, dim=1)
-        #print(cls_prob_predicate, cls_prob_predicate.shape)
 
         if self.learnable_nms:
             selected_prob, _ = cls_prob_object[:, 1:].max(dim=1, keepdim=False)
@@ -157,7 +155,6 @@ class SGGen_MSDN(models.HDN_v2.factorizable_network_v4.Factorizable_network):
             self.objects_mask = torch.ByteTensor(200, 151).fill_(0).cuda()
 
     def forward_eval(self, im_data, im_info, gt_objects=None):
-
         # Currently, RPN support batch but not for MSDN
         features, object_rois = self.rpn(im_data, im_info)
         if gt_objects is not None:

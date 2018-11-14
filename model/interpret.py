@@ -147,9 +147,7 @@ class interpreter(object):
                 infered_relation.add((pair[0],pair[1],self.pred_stoi[candidate],prob))
                 pair_txt = [self.data_set.object_classes[obj_inds[pair[0]][0]],
                             self.data_set.object_classes[obj_inds[pair[1]][0]]]
-                #print('dsfsfd:',pair_txt[0],pair_txt[1],candidate,prob)
         infered_relation= np.array(list(infered_relation)).reshape(-1, 4)
-        #print(infered_relation)
         return infered_relation
 
     def missing_object_inference(self,obj_inds,disconnected_pairs):
@@ -162,7 +160,6 @@ class interpreter(object):
         for i in range(len(disconnected_pairs)):
             pair = disconnected_pairs.pop()
             ''' wordvec based candidate objects filtering '''
-            #print(pair)
             sbj_vec = self.word_ind2vec[obj_inds[pair[0]][0]].cuda()
             obj_vec = self.word_ind2vec[obj_inds[pair[1]][0]].cuda()
             sim_sbj_obj = cosine_similarity(sbj_vec,obj_vec,dim=0)
@@ -173,8 +170,6 @@ class interpreter(object):
             sim_cans_obj = cosine_similarity(candidate_searchspace,obj_vec, dim=1)
             sim_sbj_obj = sim_sbj_obj.expand_as(sim_cans_obj)
             keep = (sim_cans_sbj + sim_cans_obj > 2 * sim_sbj_obj).nonzero().view(-1).cpu().numpy()
-            #print(keep)
-            #print(detected_obj_list)
             candidate_obj_list = detected_obj_list[keep]
             if len(candidate_obj_list) == 0: continue
 
@@ -189,9 +184,6 @@ class interpreter(object):
             probs = [self.cal_p_x_given_yz(candidate, obj_inds[pair[0]][0], obj_inds[pair[1]][0]) for candidate in candidate_obj_list]
             chosen_obj = candidate_obj_list[(np.array(probs)).argmax()]
             infered_obj_list.append(chosen_obj)
-            #print(max(probs),self.data_set.object_classes[obj_inds[pair[0]][0]],
-            #      self.data_set.object_classes[chosen_obj],
-            #      self.data_set.object_classes[obj_inds[pair[1]][0]])
 
     def get_box_centers(self,boxes):
         # Define bounding box info
@@ -444,17 +436,12 @@ class interpreter(object):
 
         # filter out triplets whose sub equal obj
         if relationships.size > 0:
-
-            #keep_rel = np.where(relationships[:, 0] != relationships[:, 1])[0]
-            #relationships = relationships[keep_rel]
             keep_rel = []
             for i,relation in enumerate(relationships):
                 if relation[0] != relation[1]:
                     keep_rel.append(i)
             keep_rel = np.array(keep_rel).astype(int)
             relationships = relationships[keep_rel]
-            # print('filter1')
-            # print(relationships.astype(int))
 
         # filter out triplets whose predicate is related to human behavior.
         if relationships.size > 0:
@@ -463,10 +450,7 @@ class interpreter(object):
                 if int(relation[2]) not in self.tobefiltered_predicates:
                     keep_rel.append(i)
             keep_rel = np.array(keep_rel).astype(int)
-            #print('keep_rel:',keep_rel)
             relationships = relationships[keep_rel]
-            # print('filter2')
-            # print(relationships.astype(int))
 
         # Object tracking
         # Filter out all un-tracked objects and triplets
@@ -502,8 +486,6 @@ class interpreter(object):
 
             sorted = relationships[:,3].argsort()[::-1]
             relationships = relationships[sorted]
-            #print('filter4')
-            #print(relationships[:,3])
 
             subject_inds = obj_cls[relationships[:, 0].astype(int)]
             object_inds = obj_cls[relationships[:, 1].astype(int)]
@@ -513,8 +495,6 @@ class interpreter(object):
             obj_scores = obj_scores[keep]
             obj_cls = obj_cls[keep]
             obj_boxes = obj_boxes[keep]
-
-            #obj_boxes = bboxes_and_uniqueIDs
 
             print(obj_scores.shape)
             print(obj_cls.shape)
@@ -526,10 +506,6 @@ class interpreter(object):
                 obj_boxes[i][4] = i
             subject_inds = obj_cls[relationships[:, 0].astype(int)]
             object_inds = obj_cls[relationships[:, 1].astype(int)]
-            #subject_boxes = obj_boxes[relationships[:, 0].astype(int)]
-            #object_boxes = obj_boxes[relationships[:, 1].astype(int)]
-            #subject_IDs = subject_boxes[:, 4].astype(int)
-            #object_IDs = object_boxes[:, 4].astype(int)
 
         predicate_inds = relationships[:, 2].astype(int)
         subject_boxes = obj_boxes[relationships[:, 0].astype(int)]
@@ -544,7 +520,6 @@ class interpreter(object):
         object_scores = [obj_scores[int(relation[1])] for relation in relationships]
         triplet_scores = np.array(zip(subject_scores, pred_scores, object_scores))
 
-        #print(relationships)
         return obj_boxes, obj_scores, obj_cls, \
                subject_inds, object_inds, \
                subject_boxes, object_boxes, \
