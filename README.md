@@ -43,4 +43,6 @@ TODO: add result figures, plots, and 3d scene graphs.
 
 
 
+## Demo Video
 
+[![Video Label](http://img.youtube.com/vi/DpW7eyF2HiI/0.jpg)](https://youtu.be/DpW7eyF2HiI)
