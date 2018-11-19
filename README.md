@@ -39,7 +39,9 @@ TODO: write examples of usage in detail
 
 ## Result
 
-TODO: add result figures, plots, and 3d scene graphs.
+![scores1](./vis_result/fig/result1.png)
+
+TODO: add more result figures, plots, and 3d scene graphs.
 
 
 
