@@ -18,8 +18,6 @@ import os
 from model import interpret, vis_tuning
 from model.keyframe.keyframe_extracion import keyframe_checker
 from model.SGGenModel import SGGen_MSDN, SGGen_DR_NET
-
-
 args = parse_args()
 # Set the random seed
 random.seed(args.seed)
@@ -82,6 +80,7 @@ imgLoader = testImageLoader(args)
 # Initial Sort tracker
 interpreter = interpret.interpreter(args, test_set, ENABLE_TRACKING=False)
 scene_graph = vis_tuning.scene_graph(args)
+vis_tools = vis_tuning.tools_for_visualizing()
 keyframe_extractor = keyframe_checker(args,
                                       thresh_key=args.thres_key,
                                       thresh_anchor=args.thres_anchor,
@@ -104,6 +103,7 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
         depth_img, pix_depth, inv_p_matrix, inv_R, Trans, camera_pose = None, None, None, None, None, None
     img_original_shape = image_scene.shape
 
+
     ''' 3. Pre-processing: Rescale & Normalization '''
     # Resize the image to target scale
     if args.dataset == 'scannet':
@@ -116,6 +116,7 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
     im_data = Image.fromarray(im_data)
     im_data = test_set.transform(im_data) # normalize the image with the pre-defined min/std.
     im_data = Variable(im_data.cuda(), volatile=True).unsqueeze(0)
+
 
     ''' 2. Key-frame Extraction: Check if this frame is key-frame or anchor-frame'''
     IS_KEY_OR_ANCHOR, sharp_score, sharp_thres = keyframe_extractor.check_frame(image_scene, depth_img, camera_pose)
@@ -142,6 +143,7 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
     ''' 3. Object Detection & Scene Graph Generation from the Pre-trained MSDN Model '''
     object_result, predicate_result = model.forward_eval(im_data, im_info, )
 
+
     ''' 4. Post-processing: Interpret the Model Output '''
     # interpret the model output
     obj_boxes, obj_scores, obj_cls, \
@@ -154,7 +156,7 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
 
     ''' 5. Print 2D Object Detection '''
     # original image_scene
-    img_obj_detected = vis_tuning.vis_object_detection(image_scene.copy(), test_set, obj_cls[:, 0], obj_boxes, obj_scores[:, 0])
+    img_obj_detected = vis_tools.vis_object_detection(image_scene.copy(), test_set, obj_cls[:, 0], obj_boxes, obj_scores[:, 0])
 
     if args.visualize:
         cv2.namedWindow('detection')  # Create a named window
@@ -198,3 +200,14 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
 
     if args.visualize:
         cv2.waitKey(args.pause_time)
+
+
+
+
+
+
+
+
+
+
+
