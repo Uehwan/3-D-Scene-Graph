@@ -73,7 +73,7 @@ def parse_args():
                         help='disable spurious rejection if true')
     parser.add_argument('--disable_samenode', action='store_true',
                         help='disable same node detection if true')
-    parser.add_argument('--pause_time', type=int, default=3000,
+    parser.add_argument('--pause_time', type=int, default=1,
                         help='pause time')
     parser.add_argument('--plot_graph', action='store_true',
                         help='plot graph if true')
@@ -81,6 +81,11 @@ def parse_args():
                         help='enable visualization')
     parser.add_argument('--format', type=str, default='png',
                         help='scene graph image format, pdf or png')
+    parser.add_argument('--draw_color', action='store_true',
+                        help='draw color node in scene graph if true')
+    parser.add_argument('--save_image', action='store_true',
+                        help='save detection result image if true')
+
     args = parser.parse_args()
 
     return args
