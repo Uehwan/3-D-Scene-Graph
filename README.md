@@ -26,20 +26,6 @@ Please follow the installation instructions in [FactorizableNet](https://github.
    ./build.sh
 ```
 
-
-
-* 
-
-* Install pcl
-```
-install pcl 1.7.2
-sudo apt install python-sphinx doxygen doxygen-latex dh-exec build-essential devscripts
-dget -u https://launchpad.net/ubuntu/+archive/primary/+files/pcl_1.7.2-14ubuntu1.16.04.1.dsc
-cd pcl-1.7.2
-sudo dpkg-buildpackage -r -uc -b
-sudo dpkg -i pcl_*.deb
-```
-
 TODO: write installation in detail
 TODO: add one-click installation script
 
@@ -53,8 +39,12 @@ TODO: write examples of usage in detail
 
 ## Result
 
-TODO: add result figures, plots, and 3d scene graphs.
+![scores1](./vis_result/fig/result1.png)
+
+TODO: add more result figures, plots, and 3d scene graphs.
 
 
 
+## Demo Video
 
+[![Video Label](http://img.youtube.com/vi/DpW7eyF2HiI/0.jpg)](https://youtu.be/DpW7eyF2HiI)

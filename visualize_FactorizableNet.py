@@ -15,15 +15,16 @@ import models as models
 from models.HDN_v2.utils import interpret_relationships
 import warnings
 
+
 parser = argparse.ArgumentParser('Options for training Hierarchical Descriptive Model in pytorch')
 
-parser.add_argument('--path_opt', default='options/models/VG-MSDN.yaml', type=str,
+parser.add_argument('--path_opt', default='options/models/VG-DR-Net.yaml', type=str,
                     help='path to a yaml options file, VG-DR-Net.yaml or VG-MSDN.yaml')
 parser.add_argument('--dataset_option', type=str, default='normal', help='data split selection [small | fat | normal]')
 parser.add_argument('--batch_size', type=int, help='#images per batch')
 parser.add_argument('--workers', type=int, default=4, help='#idataloader workers')
 # model init
-parser.add_argument('--pretrained_model', type=str, default = 'FactorizableNet/output/trained_models/Model-VG-MSDN.h5',
+parser.add_argument('--pretrained_model', type=str, default = 'FactorizableNet/output/trained_models/Model-VG-DR-Net.h5',
                     help='path to pretrained_model, Model-VG-DR-Net.h5 or Model-VG-MSDN.h5')
 
 # structure settings
@@ -70,7 +71,6 @@ def vis_object_detection(image_scene, test_set,
 
 
 if __name__ == '__main__':
-
     # Set options
     options = {
         'data':{
@@ -110,7 +110,6 @@ if __name__ == '__main__':
                                                 pin_memory=True,
                                                 collate_fn=getattr(datasets, options['data']['dataset']).collate)
 
-
     network.set_trainable(model, False)
     print('Loading pretrained model: {}'.format(args.pretrained_model))
     args.train_all = True
@@ -118,7 +117,6 @@ if __name__ == '__main__':
     # Setting the state of the training model
     model.cuda()
     model.eval()
-
 
     for i, sample in enumerate(test_loader): # (im_data, im_info, gt_objects, gt_relationships)
         if i < 500: continue
@@ -167,9 +165,6 @@ if __name__ == '__main__':
         cutline_idx = max(keep_rel)
         relationships = relationships[:cutline_idx+1]
 
-
-
-
         print('-------Subject-------|------Predicate-----|--------Object---------|--Score-')
         for relation in relationships:
             if relation[2] > 0:  # '0' is the class 'irrelevant'
@@ -184,20 +179,16 @@ if __name__ == '__main__':
                     obj_ID=str(int(relation[1])),
                     triplet_score=relation[3]))
 
-            if relation[2]==9:
-                sample_img_path = './data/svg/images/' + test_set.annotations[i]['path']
-                img_scene = cv2.imread(sample_img_path)
-                colorlist = [(random.randint(0, 210), random.randint(0, 210), random.randint(0, 210)) for i in
-                             range(10000)]
-                img_scene = vis_object_detection(img_scene, test_set, obj_cls, obj_boxes, obj_scores)
-                cv2.imshow('sample', img_scene)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
 
+        sample_img_path = './data/svg/images/' + test_set.annotations[i]['path']
+        img_scene = cv2.imread(sample_img_path)
+        colorlist = [(random.randint(0, 210), random.randint(0, 210), random.randint(0, 210)) for i in
+                     range(10000)]
+        img_scene = vis_object_detection(img_scene, test_set, obj_cls, obj_boxes, obj_scores)
+        cv2.imshow('sample', img_scene)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
-        # cv2.imshow('sample',img_scene)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
 
         result = {'objects': {
             'bbox': obj_boxes,

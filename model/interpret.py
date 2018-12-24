@@ -1,20 +1,17 @@
 import sys
 sys.path.append('./FactorizableNet')
-from models.HDN_v2.utils import interpret_relationships
 from lib.fast_rcnn.nms_wrapper import nms
-from lib import network
 from lib.fast_rcnn.bbox_transform import bbox_transform_inv_hdn, clip_boxes
-import lib.utils.logger as logger
 from lib.utils.nms import triplet_nms as triplet_nms_py
-from lib.utils.nms import unary_nms
 from sort.sort import Sort, iou
 import numpy as np
 from torch.autograd import Variable
 import torchtext
 import torch
-import prior
-from SGGenModel import VG_DR_NET_OBJ_IGNORES,VG_MSDN_OBJ_IGNORES
+from prior import relation_prior
+from SGGenModel import VG_DR_NET_OBJ_IGNORES
 from torch.nn.functional import cosine_similarity
+
 
 def filter_untracted(ref_bbox, tobefiltered_bbox):
     keep = []
@@ -22,6 +19,7 @@ def filter_untracted(ref_bbox, tobefiltered_bbox):
         ious = [iou(bbox[:4], obj_box) for obj_box in tobefiltered_bbox]
         keep.append(np.argmax(ious))
     return keep
+
 
 def nms_detections(pred_boxes, scores, nms_thresh, inds=None):
     keep = range(scores.shape[0])
@@ -37,6 +35,19 @@ def nms_detections(pred_boxes, scores, nms_thresh, inds=None):
 
 
 class interpreter(object):
+    """
+    Description
+        - Interpret and analyze the results of recognition module
+        - Statistical and semantic priors are used to filter out spurious detections
+            - Statistical prior: generated from visual genome dataset
+            - Semantic prior: generated from word2vec
+        - Relations are interpreted (inferred and rejected) and missing objects are inferred
+    Major Functions
+        - functions for calculating proabilities: cal_p_xy_joint, cal_p_x_given_y, cal_p_x_given_yz, check_prob_condition
+        - spurious_relation_rejection: spurious detections get rejected based on priors
+        - missing_object_inference: missing objects are inferred and added to 3D scene graph
+        - missing_relation_inference: missing relations are inferred and added to 3D scene graph
+    """
     def __init__(self,args, data_set,ENABLE_TRACKING=None):
         self.tracker = Sort()
         self.args = args
@@ -61,8 +72,8 @@ class interpreter(object):
             self.tobefiltered_predicates = []
 
         # Params for Statistics Based Scene Graph Inference
-        self.relation_statistics = prior.load_obj("relation_prior_prob")
-        self.joint_probability = prior.load_obj("object_prior_prob")
+        self.relation_statistics = relation_prior.load_obj("model/prior/preprocessed/relation_prior_prob")
+        self.joint_probability = relation_prior.load_obj("model/prior/preprocessed/object_prior_prob")
         self.spurious_rel_thres = 0.07
         self.rel_infer_thres = 0.9
         self.obj_infer_thres = 0.001
@@ -97,7 +108,6 @@ class interpreter(object):
         p_yz = self.cal_p_xy_joint(y_ind,z_ind)
         return p_xz**2 < p_xy*p_yz
 
-
     def prepare_wordvecs(self,num_vocabs = 400, ignores = VG_DR_NET_OBJ_IGNORES):
         word_inds = range(num_vocabs)
         word_inds = [x for x in word_inds if x not in ignores]
@@ -109,10 +119,8 @@ class interpreter(object):
         word_stoi = {self.data_set.object_classes[x]:i for i, x in enumerate(word_inds)}
         return word_vecs, word_itos, word_stoi
 
-
     def update_obj_set(self,obj_inds):
         for obj_ind in obj_inds[:,0]: self.detected_obj_set.add(obj_ind)
-
 
     def find_disconnected_pairs(self,obj_inds, relationships):
         connected_pairs = set(tuple(x) for x in relationships[:, :2].astype(int).tolist())
@@ -124,7 +132,6 @@ class interpreter(object):
                 disconnected_pairs.add((i,j))
         return disconnected_pairs
 
-
     def missing_relation_inference(self,obj_inds,obj_boxes,disconnected_pairs):
         infered_relation=set()
         #print('discon:',disconnected_pairs)
@@ -134,17 +141,14 @@ class interpreter(object):
             distance = self.distance_between_boxes(np.stack([node1_box, node2_box], axis=0))[0, 1]
             pair_txt = [self.data_set.object_classes[obj_inds[pair[0]][0]],
                         self.data_set.object_classes[obj_inds[pair[1]][0]]]
-            candidate, prob, direction = prior.most_probable_relation_for_unpaired(pair_txt,self.relation_statistics,int(distance))
+            candidate, prob, direction = relation_prior.most_probable_relation_for_unpaired(pair_txt, self.relation_statistics, int(distance))
             if candidate !=None and prob > self.rel_infer_thres:
                 if not direction: pair = (pair[1],pair[0])
                 infered_relation.add((pair[0],pair[1],self.pred_stoi[candidate],prob))
                 pair_txt = [self.data_set.object_classes[obj_inds[pair[0]][0]],
                             self.data_set.object_classes[obj_inds[pair[1]][0]]]
-                #print('dsfsfd:',pair_txt[0],pair_txt[1],candidate,prob)
         infered_relation= np.array(list(infered_relation)).reshape(-1, 4)
-        #print(infered_relation)
         return infered_relation
-
 
     def missing_object_inference(self,obj_inds,disconnected_pairs):
         detected_obj_list = np.array(list(self.detected_obj_set))
@@ -156,7 +160,6 @@ class interpreter(object):
         for i in range(len(disconnected_pairs)):
             pair = disconnected_pairs.pop()
             ''' wordvec based candidate objects filtering '''
-            #print(pair)
             sbj_vec = self.word_ind2vec[obj_inds[pair[0]][0]].cuda()
             obj_vec = self.word_ind2vec[obj_inds[pair[1]][0]].cuda()
             sim_sbj_obj = cosine_similarity(sbj_vec,obj_vec,dim=0)
@@ -167,8 +170,6 @@ class interpreter(object):
             sim_cans_obj = cosine_similarity(candidate_searchspace,obj_vec, dim=1)
             sim_sbj_obj = sim_sbj_obj.expand_as(sim_cans_obj)
             keep = (sim_cans_sbj + sim_cans_obj > 2 * sim_sbj_obj).nonzero().view(-1).cpu().numpy()
-            #print(keep)
-            #print(detected_obj_list)
             candidate_obj_list = detected_obj_list[keep]
             if len(candidate_obj_list) == 0: continue
 
@@ -183,10 +184,6 @@ class interpreter(object):
             probs = [self.cal_p_x_given_yz(candidate, obj_inds[pair[0]][0], obj_inds[pair[1]][0]) for candidate in candidate_obj_list]
             chosen_obj = candidate_obj_list[(np.array(probs)).argmax()]
             infered_obj_list.append(chosen_obj)
-            #print(max(probs),self.data_set.object_classes[obj_inds[pair[0]][0]],
-            #      self.data_set.object_classes[chosen_obj],
-            #      self.data_set.object_classes[obj_inds[pair[1]][0]])
-
 
     def get_box_centers(self,boxes):
         # Define bounding box info
@@ -208,7 +205,6 @@ class interpreter(object):
         dist = np.linalg.norm(centers_axis1 - centers_axis2, axis=1).reshape(-1,centers.shape[0])
         return dist
 
-
     def spurious_relation_rejection(self,obj_boxes,obj_cls,relationships):
         if self.args.disable_spurious: return range(len(relationships))
         subject_inds = obj_cls[relationships.astype(int)[:,0]][:, 0]
@@ -225,7 +221,7 @@ class interpreter(object):
                             self.data_set.predicate_classes[pred_ind],
                             self.data_set.object_classes[obj_ind]]
             distance = self.distance_between_boxes(np.stack([sbj_box,obj_box],axis=0))[0,1]
-            prob = prior.triplet_prob_from_statistics(relation_txt,self.relation_statistics,int(distance))
+            prob = relation_prior.triplet_prob_from_statistics(relation_txt, self.relation_statistics, int(distance))
             print('prob: {prob:3.2f}     {sbj:15}{rel:15}{obj:15}'.format(prob=prob,
                                                                           sbj=relation_txt[0],
                                                                           rel=relation_txt[1],
@@ -234,10 +230,6 @@ class interpreter(object):
             if prob > self.spurious_rel_thres: keep.append(i)
 
         return keep
-
-
-
-
 
     def interpret_graph(self,object_result, predicate_result,im_info):
         cls_prob_object, bbox_object, object_rois, reranked_score = object_result[:4]
@@ -287,8 +279,6 @@ class interpreter(object):
                subject_boxes[keep], object_boxes[keep], \
                subject_IDs[keep], object_IDs[keep], \
                predicate_inds[keep], triplet_scores[keep], relationships[keep]
-
-
 
     def interpret_graph_(self,cls_prob_object, bbox_object, object_rois,
                                 cls_prob_predicate, mat_phrase, im_info,
@@ -436,7 +426,6 @@ class interpreter(object):
             keep_obj_assign = np.where(relationships[:, 1] <= cutline_idx)[0]
             relationships = relationships[keep_obj_assign]
 
-
         # filter out triplets who have low total_score
         if relationships.size > 0:
             keep_rel = np.where(relationships[:, 3] >= self.triplet_thres)[0]  # MSDN:0.02, DR-NET:0.03
@@ -447,19 +436,12 @@ class interpreter(object):
 
         # filter out triplets whose sub equal obj
         if relationships.size > 0:
-
-            #keep_rel = np.where(relationships[:, 0] != relationships[:, 1])[0]
-            #relationships = relationships[keep_rel]
             keep_rel = []
             for i,relation in enumerate(relationships):
                 if relation[0] != relation[1]:
                     keep_rel.append(i)
             keep_rel = np.array(keep_rel).astype(int)
             relationships = relationships[keep_rel]
-            # print('filter1')
-            # print(relationships.astype(int))
-
-
 
         # filter out triplets whose predicate is related to human behavior.
         if relationships.size > 0:
@@ -468,10 +450,7 @@ class interpreter(object):
                 if int(relation[2]) not in self.tobefiltered_predicates:
                     keep_rel.append(i)
             keep_rel = np.array(keep_rel).astype(int)
-            #print('keep_rel:',keep_rel)
             relationships = relationships[keep_rel]
-            # print('filter2')
-            # print(relationships.astype(int))
 
         # Object tracking
         # Filter out all un-tracked objects and triplets
@@ -505,17 +484,11 @@ class interpreter(object):
             for i, k in enumerate(keep):
                 relationships[:,:2][rel[:,:2] == k] = i
 
-
-
             sorted = relationships[:,3].argsort()[::-1]
             relationships = relationships[sorted]
-            #print('filter4')
-            #print(relationships[:,3])
 
             subject_inds = obj_cls[relationships[:, 0].astype(int)]
             object_inds = obj_cls[relationships[:, 1].astype(int)]
-
-
             obj_boxes = np.concatenate([obj_boxes, np.zeros([obj_boxes.shape[0], 1])], axis=1)
             for i, keep_idx in enumerate(keep):
                 obj_boxes[keep_idx] = bboxes_and_uniqueIDs[i]
@@ -523,24 +496,16 @@ class interpreter(object):
             obj_cls = obj_cls[keep]
             obj_boxes = obj_boxes[keep]
 
-            #obj_boxes = bboxes_and_uniqueIDs
-
             print(obj_scores.shape)
             print(obj_cls.shape)
             print(obj_boxes.shape)
             print(relationships.shape)
-
         else:
             obj_boxes = np.concatenate([obj_boxes, np.zeros([obj_boxes.shape[0], 1])], axis=1)
             for i in range(len(obj_boxes)):
                 obj_boxes[i][4] = i
             subject_inds = obj_cls[relationships[:, 0].astype(int)]
             object_inds = obj_cls[relationships[:, 1].astype(int)]
-            #subject_boxes = obj_boxes[relationships[:, 0].astype(int)]
-            #object_boxes = obj_boxes[relationships[:, 1].astype(int)]
-            #subject_IDs = subject_boxes[:, 4].astype(int)
-            #object_IDs = object_boxes[:, 4].astype(int)
-
 
         predicate_inds = relationships[:, 2].astype(int)
         subject_boxes = obj_boxes[relationships[:, 0].astype(int)]
@@ -554,9 +519,6 @@ class interpreter(object):
                        relationships]
         object_scores = [obj_scores[int(relation[1])] for relation in relationships]
         triplet_scores = np.array(zip(subject_scores, pred_scores, object_scores))
-
-        #print(relationships)
-
 
         return obj_boxes, obj_scores, obj_cls, \
                subject_inds, object_inds, \

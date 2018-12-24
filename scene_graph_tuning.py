@@ -3,7 +3,6 @@ sys.path.append('./FactorizableNet')
 import random
 import numpy.random as npr
 import numpy as np
-import argparse
 import yaml
 from pprint import pprint
 import cv2
@@ -12,18 +11,15 @@ from torch.autograd import Variable
 from lib import network
 import lib.datasets as datasets
 import lib.utils.general_utils as utils
-import models as models
-from models.HDN_v2.utils import interpret_relationships
-import warnings
-from settings import parse_args, testImageLoader
+from model.settings import parse_args, testImageLoader
 from PIL import Image
-from sort.sort import Sort,iou
 import os.path as osp
 import os
-import interpret
-import vis_tuning
-from keyframe_extracion import keyframe_checker
-from SGGenModel import SGGen_MSDN, SGGen_DR_NET
+from model import interpret, vis_tuning
+from model.vis_tuning import tools_for_visualizing
+from model.keyframe.keyframe_extracion import keyframe_checker
+from model.SGGenModel import SGGen_MSDN, SGGen_DR_NET
+
 args = parse_args()
 # Set the random seed
 random.seed(args.seed)
@@ -84,7 +80,7 @@ print('3D-Scene-Graph-Generator Demo: Object detection and Scene Graph Generatio
 print('--------------------------------------------------------------------------')
 imgLoader = testImageLoader(args)
 # Initial Sort tracker
-interpreter = interpret.interpreter(args,test_set,ENABLE_TRACKING=False)
+interpreter = interpret.interpreter(args, test_set, ENABLE_TRACKING=False)
 scene_graph = vis_tuning.scene_graph(args)
 keyframe_extractor = keyframe_checker(args,
                                       thresh_key=args.thres_key,
@@ -131,7 +127,7 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
     image_original = image_scene.copy()
     if args.visualize:
         cv2.namedWindow('detection')  # Create a named window
-        cv2.moveWindow('detection', 10, 10)
+        cv2.moveWindow('detection', 1400, 10)
         cv2.putText(image_original,
                     winname_scene,
                     (1, 11),
@@ -161,11 +157,11 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
 
     ''' 5. Print 2D Object Detection '''
     # original image_scene
-    img_obj_detected = vis_tuning.vis_object_detection(image_scene.copy(), test_set, obj_cls[:, 0], obj_boxes, obj_scores[:, 0])
+    img_obj_detected = tools_for_visualizing.vis_object_detection(image_scene.copy(), test_set, obj_cls[:, 0], obj_boxes, obj_scores[:, 0])
 
     if args.visualize:
         cv2.namedWindow('detection')  # Create a named window
-        cv2.moveWindow('detection', 10, 10)
+        cv2.moveWindow('detection', 1400, 10)
         cv2.putText(img_obj_detected,
                     winname_scene,
                     (1, 11),
@@ -173,14 +169,16 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
                     0.5,
                     (30, 200, 30),
                     2)
-        cv2.imshow('detection', img_obj_detected)
-    scene_name = args.scannet_path.split('/')[-1]
-    try: os.makedirs(osp.join(args.vis_result_path, scene_name,'original'))
-    except: pass
-    try: os.makedirs(osp.join(args.vis_result_path, scene_name,'detection'))
-    except: pass
-    cv2.imwrite(osp.join(args.vis_result_path, scene_name,'original',str(idx) + '.jpg'), image_scene)
-    cv2.imwrite(osp.join(args.vis_result_path, scene_name,'detection',str(idx) + '.jpg'), img_obj_detected)
+        cv2.imshow('detection', image_original)
+
+    if args.save_image:
+        scene_name = args.scannet_path.split('/')[-1]
+        try: os.makedirs(osp.join(args.vis_result_path, scene_name,'original'))
+        except: pass
+        try: os.makedirs(osp.join(args.vis_result_path, scene_name,'detection'))
+        except: pass
+        cv2.imwrite(osp.join(args.vis_result_path, scene_name,'original',str(idx) + '.jpg'), image_scene)
+        cv2.imwrite(osp.join(args.vis_result_path, scene_name,'detection',str(idx) + '.jpg'), img_obj_detected)
 
     ''' 6. Merge Relations into 3D Scene Graph'''
     updated_image_scene = scene_graph.vis_scene_graph(image_scene.copy(), idx, test_set,
@@ -188,9 +186,10 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
                                                       subject_inds, predicate_inds, object_inds,
                                                       subject_IDs, object_IDs, triplet_scores,relationships,
                                                       pix_depth, inv_p_matrix, inv_R, Trans, dataset=args.dataset)
+
     if args.visualize:
         cv2.namedWindow('updated')  # Create a named window
-        cv2.moveWindow('updated', 700, 10)
+        cv2.moveWindow('updated', 1400, 520)
         cv2.putText(updated_image_scene,
                     winname_scene,
                     (1, 11),
@@ -199,9 +198,12 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
                     (30, 200, 30),
                     2)
         cv2.imshow('updated', updated_image_scene)
-    try: os.makedirs(osp.join(args.vis_result_path, scene_name,'updated'))
-    except: pass
-    cv2.imwrite(osp.join(args.vis_result_path, scene_name,'updated','updated'+str(idx) +'.jpg'), updated_image_scene)
+
+    if args.save_image:
+        scene_name = args.scannet_path.split('/')[-1]
+        try: os.makedirs(osp.join(args.vis_result_path, scene_name,'updated'))
+        except: pass
+        cv2.imwrite(osp.join(args.vis_result_path, scene_name,'updated','updated'+str(idx) +'.jpg'), updated_image_scene)
 
     if args.visualize:
         cv2.waitKey(args.pause_time)

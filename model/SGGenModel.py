@@ -36,7 +36,7 @@ objects_ignored (VG-DR-NET)
 325 shoulder       331 surfer         334 bluesky         335 whiteclouds   337 vehicle      340 baseball       
 341 baseballplayer 350 hoof           354 snowboarder     358 shade         360 spectator    361 knee           
 366 platform       372 weeds          373 treetrunk       396 ripples       399 tusk
-93 tennisracket 124 skipole 338 streetsign 370 t-shirt 379 tennisball
+93 tennisracket    124 skipole        338 streetsign      370 t-shirt       379 tennisball
 '''
 
 VG_MSDN_PRED_IGNORES=(9,12, 18,20,22, 27, 28, 30, 31, 32, 35, 48)
@@ -59,8 +59,14 @@ objects_ignored (VG-MSDN)
 '''
 
 
-
 class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
+    """
+    Description
+        - Detect and recognize objects with relations
+        - DR_net extends factorizable network
+    Functions
+        - forward_eval: generate detection & recognition results for the given image
+    """
     def __init__(self,args, trainset, opts,
                  ):
         super(SGGen_DR_NET,self).__init__(trainset,opts)
@@ -82,7 +88,6 @@ class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
         self.predicate_class_filter =[]
 
     def forward_eval(self, im_data, im_info, gt_objects=None):
-
         # Currently, RPN support batch but not for MSDN
         features, object_rois = self.rpn(im_data, im_info)
         if gt_objects is not None:
@@ -110,13 +115,9 @@ class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
         cls_score_object = self.score_obj(pooled_object_features)
         cls_score_object.data.masked_fill_(self.objects_mask, -float('inf'))
         cls_prob_object = F.softmax(cls_score_object, dim=1)
-        #print(cls_score_object,cls_score_object.shape)
         cls_score_predicate = self.score_pred(pooled_phrase_features)
         cls_score_predicate.data.masked_fill_(self.predicates_mask, -float('inf'))
         cls_prob_predicate = F.softmax(cls_score_predicate, dim=1)
-        #print(cls_prob_predicate, cls_prob_predicate.shape)
-
-
 
         if self.learnable_nms:
             selected_prob, _ = cls_prob_object[:, 1:].max(dim=1, keepdim=False)
@@ -124,11 +125,18 @@ class SGGen_DR_NET(models.HDN_v2.factorizable_network_v4s.Factorizable_network):
         else:
             reranked_score = None
 
-
         return (cls_prob_object, bbox_object, object_rois, reranked_score), \
                 (cls_prob_predicate, mat_phrase, region_rois.size(0)),
 
+
 class SGGen_MSDN(models.HDN_v2.factorizable_network_v4.Factorizable_network):
+    """
+    Description
+        - Detect and recognize objects with relations
+        - MSDN extends factorizable network
+    Functions
+        - forward_eval: generate detection & recognition results for the given image
+    """
     def __init__(self,args, trainset, opts,
                  ):
         super(SGGen_MSDN,self).__init__(trainset,opts)
@@ -146,10 +154,7 @@ class SGGen_MSDN(models.HDN_v2.factorizable_network_v4.Factorizable_network):
             self.predicates_mask = torch.ByteTensor(40000, 51).fill_(0).cuda()
             self.objects_mask = torch.ByteTensor(200, 151).fill_(0).cuda()
 
-
-
     def forward_eval(self, im_data, im_info, gt_objects=None):
-
         # Currently, RPN support batch but not for MSDN
         features, object_rois = self.rpn(im_data, im_info)
         if gt_objects is not None:
@@ -180,7 +185,6 @@ class SGGen_MSDN(models.HDN_v2.factorizable_network_v4.Factorizable_network):
         cls_score_predicate = self.score_pred(pooled_phrase_features)
         cls_score_predicate.data.masked_fill_(self.predicates_mask, -float('inf'))
         cls_prob_predicate = F.softmax(cls_score_predicate, dim=1)
-
 
         if self.learnable_nms:
             selected_prob, _ = cls_prob_object[:, 1:].max(dim=1, keepdim=False)

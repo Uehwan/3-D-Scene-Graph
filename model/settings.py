@@ -9,6 +9,7 @@ import cv2
 import yaml
 import lib.utils.general_utils as utils
 
+
 def parse_args():
     parser = argparse.ArgumentParser('Options for Running 3D-Scene-Graph-Generator in pytorch')
 
@@ -33,8 +34,6 @@ def parse_args():
     # testing settings
     parser.add_argument('--use_gt_boxes', action='store_true', help='Use ground truth bounding boxes for evaluation')
 
-
-
     '''Demo Settings in 3D-Scene-Graph'''
     # Data loader Settings
     parser.add_argument('--dataset' ,type=str, default='scannet',
@@ -56,7 +55,6 @@ def parse_args():
                         help=' ')
     parser.add_argument('--max_group_len', type=float, default=10,
                         help=' ')
-
     parser.add_argument('--alpha', type=float, default=0.4,
                         help='weight for Exponentially Weighted Summation')
     parser.add_argument('--gain', type=float, default=25,
@@ -75,7 +73,7 @@ def parse_args():
                         help='disable spurious rejection if true')
     parser.add_argument('--disable_samenode', action='store_true',
                         help='disable same node detection if true')
-    parser.add_argument('--pause_time', type=int, default=3000,
+    parser.add_argument('--pause_time', type=int, default=1,
                         help='pause time')
     parser.add_argument('--plot_graph', action='store_true',
                         help='plot graph if true')
@@ -83,12 +81,24 @@ def parse_args():
                         help='enable visualization')
     parser.add_argument('--format', type=str, default='png',
                         help='scene graph image format, pdf or png')
+    parser.add_argument('--draw_color', action='store_true',
+                        help='draw color node in scene graph if true')
+    parser.add_argument('--save_image', action='store_true',
+                        help='save detection result image if true')
+
     args = parser.parse_args()
 
     return args
 
 
 class testImageLoader(object):
+    """
+    Description
+        - Loads images for test
+        - Specify which dataset to use for test
+    Functions
+        - load_image: loads one image of given frame id
+    """
     def __init__(self,args):
         self.args = args
         self.mot_benchmark_train = ['ADL-Rundle-6', 'ADL-Rundle-8','ETH-Bahnhof','ETH-Pedcross2','ETH-Sunnyday',
@@ -124,7 +134,6 @@ class testImageLoader(object):
         self.num_frames = len(os.listdir(self.img_folder_path))
 
     def load_image(self,frame_idx):
-
         if self.args.dataset == 'scannet':
             # Load an image from ScanNet Dataset
             img_path = osp.join(self.img_folder_path, str(frame_idx+1) + '.jpg')
