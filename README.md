@@ -92,7 +92,7 @@ python reader.py \
 
 ```
 python scene_graph_tuning.py \
-  --scannet_path data/lab_kitchen17/\
+  --scannet_path data/scene0000_00/\
   --obj_thres 0.23\
   --thres_key 0.2\
   --thres_anchor 0.68 \
