@@ -1,8 +1,9 @@
-# 3D-Scene-Graph
+# 3D-Scene-Graph: *A Sparse and Semantic Representation of Physical Environments for Intelligent Agents*
 3D scene graph generator from RGBD video, based on [FactorizableNet](https://github.com/yikang-li/FactorizableNet), implemented in Pytorch.
- 
+![intro](./vis_result/fig/3dsg_readme_fig.png)
+
 ## Requirements
-* Ubuntu 16.04
+* Ubuntu 16.04+
 * Python 2.7
 * Pytorch 0.3.1
 * FactorizableNet
@@ -18,7 +19,9 @@
 ```
     cd 3D-Scene-Graph/FactorizableNet
 ```
-Please follow the installation instructions in [FactorizableNet](https://github.com/yikang-li/FactorizableNet) repository, including downloading the pre-trained FactorizableNet trained from MSDN-DR-Net dataset.
+Please follow the installation instructions in [FactorizableNet](https://github.com/yikang-li/FactorizableNet) repository.
+Follow steps 1 through 6. You can skip step 7. Download VG-DR-Net in step 8. You do not need to download other models.
+
 
 3. Install 3D-Scene-Graph
 ```
