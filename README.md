@@ -19,6 +19,7 @@ Finally,  the  gathered information gets fused into 3D scene graph and the graph
 * Ubuntu 16.04+
 * Python 2.7
 * [Pytorch 0.3.1](https://pytorch.org/get-started/previous-versions/) 
+* torchtext 0.2.3
 * [FactorizableNet](https://github.com/yikang-li/FactorizableNet)
 * [ScanNet](http://www.scan-net.org) dataset (optional, used for test. an RGBD video from ScanNet is enough.)
 
@@ -76,7 +77,13 @@ To extract them, we use SensReader, an extraction tool provided by [ScanNet git 
 ```
 git clone https://github.com/ScanNet/ScanNet.git
 cd ScanNet/SensReader/python/
-python reader.py --filename [your .sens filepath]  --output_path [ROOT of 3D-Scene-Graph]/data/scene0000_00/ --export_depth_images --export_color_images --export_poses --export_intrinsics
+python reader.py \
+   --filename [your .sens filepath]  \
+   --output_path [ROOT of 3D-Scene-Graph]/data/scene0000_00/ \
+   --export_depth_images \
+   --export_color_images \
+   --export_poses \
+   --export_intrinsics
     
 ```
 
@@ -84,7 +91,18 @@ python reader.py --filename [your .sens filepath]  --output_path [ROOT of 3D-Sce
 ## Example of usage
 
 ```
-python scene_graph_tuning.py --scannet_path data/scene0000_00/ --obj_thres 0.23 --thres_key 0.2 --thres_anchor 0.68 --visualize --frame_start 800 --plot_graph --disable_spurious --gain 10 --detect_cnt_thres 2 --triplet_thres 0.065
+python scene_graph_tuning.py \
+  --scannet_path data/lab_kitchen17/\
+  --obj_thres 0.23\
+  --thres_key 0.2\
+  --thres_anchor 0.68 \
+  --visualize \
+  --frame_start 800 \
+  --plot_graph \
+  --disable_spurious \
+  --gain 10 \
+  --detect_cnt_thres 2 \
+  --triplet_thres 0.065
 ```
 
 ### Core hyper-parameters #
@@ -123,9 +141,6 @@ Visualization Settings:
 ## Result
 
 ![scores1](./vis_result/fig/result1.png)
-
-TODO: add more result figures, plots, and 3d scene graphs.
-
 
 
 ## Demo Video
