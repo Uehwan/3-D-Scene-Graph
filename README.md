@@ -54,7 +54,7 @@ pip install setuptools pyyaml graphviz webcolors pandas matplotlib
 pip install git+https://github.com/chickenbestlover/ColorHistogram.git
 ```
 
-Alternatives: use installation script
+An Alternative: use installation script
 ```
    ./build.sh
 ```
@@ -70,7 +70,8 @@ download-scannet.py -o [directory in which to download] --id scene0000_00
 (then press Enter twice)
 ```
 After the download is finished, the scan is located in a new folder `scene0000_00`.
-In the folder, `*.sens` file contains the RGBD Video with camera pose. To extract them, we use SensReader, an extraction tool provided by ScanNet git repo.
+In the folder, `*.sens` file contains the RGBD Video with camera pose. 
+To extract them, we use SensReader, an extraction tool provided by [ScanNet git repo](https://github.com/ScanNet/ScanNet).
 
 ```
 git clone https://github.com/ScanNet/ScanNet.git
@@ -86,7 +87,38 @@ python reader.py --filename [your .sens filepath]  --output_path [ROOT of 3D-Sce
 python scene_graph_tuning.py --scannet_path data/scene0000_00/ --obj_thres 0.23 --thres_key 0.2 --thres_anchor 0.68 --visualize --frame_start 800 --plot_graph --disable_spurious --gain 10 --detect_cnt_thres 2 --triplet_thres 0.065
 ```
 
-TODO: write examples of usage in detail
+### Core hyper-parameters #
+
+Data settings:
+* *--dataset <dataset>* : choose dataset, default='scannet'.
+* *--scannet_path <scannetpath>* : scannet scan filepath , default='./data/scene0507/'.
+* *--frame_start <scannetpath>* : idx of frame to start , default=0.
+* *--frame_end <scannetpath>* : idx of frame to end , default=5000.
+
+FactorizableNet Output Filtering Settings:
+* *--obj_thres <objthres>* : object recognition threshold score , default=0.25.
+* *--triplet_thres <trithres>* : triplet recognition threshold score , default=0.08.
+* *--nms <trithres>* : NMS threshold for post object NMS (negative means not NMS) , default=0.2.
+* *--triplet_nms <trithres>* : Triplet NMS threshold for post object NMS (negative means not NMS) , default=0.4.
+
+
+Key-frame Extraction Settings:
+* *--thres_key <key>* : keyframe threshold score , default=0.1.
+* *--thres_anchor <anchor>* : achorframe threshold score , default=0.65.
+* *--alpha <anchor>* : weight for Exponentially Weighted Summation , default=0.4.
+* *--gain <anchor>* : gain for adaptive thresholding in blurry image detection , default=25.
+* *--offset <anchor>* : offset for adaptive thresholding in blurry image detection , default=1.
+
+Visualization Settings:
+* *--pause_time <key>* : a pause interval (sec) for every detection , default=1.
+* *--plot_graph <key>* : plot 3D Scene Graph if true.
+* *--visualize <key>* : enable visualization if ture.
+* *--format <key>* : resulting image format, pdf or png, default='png'.
+* *--draw_color <key>* : draw color node in 3D scene graph if true.
+* *--save_image <key>* : save detection result image if true.
+
+
+
 
 ## Result
 
