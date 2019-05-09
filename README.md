@@ -1,9 +1,7 @@
 # 3D-Scene-Graph: *A Sparse and Semantic Representation of Physical Environments for Intelligent Agents*
 3D scene graph generator from RGBD video, based on [FactorizableNet](https://github.com/yikang-li/FactorizableNet), implemented in Pytorch.
 
-#<img src="vis_result/fig/3dsg_readme_fig.png" width="200">
-
-![intro](./vis_result/fig/3dsg_readme_fig.png | width=100)
+<img src="vis_result/fig/3dsg_readme_fig.png" width="600", height="400">
 
 ## Requirements
 * Ubuntu 16.04+
