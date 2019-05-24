@@ -54,7 +54,7 @@ def warp_image(target, depth, rel_pose, intrinsic):
     return output
 
 
-def calculate_overlap(depth, pose, intrinsic, pixel_coordinates,num_coordinate_samples=1000):
+def calculate_overlap(depth_org, rel_pose, intrinsic_org, pixel_coordinates,num_coordinate_samples=1000):
     """
         Description
             - Calculate overlap between two images based on projection
@@ -70,56 +70,33 @@ def calculate_overlap(depth, pose, intrinsic, pixel_coordinates,num_coordinate_s
             - amount_overlap: estimated amount of overlap in percentage
 
     """
-
-    # print('depth')
-    # print(depth, depth.shape, depth.dtype)
-    # print('pose')
-    # print(pose, pose.shape, pose.dtype)
-    # print('intrinsic')
-    # print(intrinsic, intrinsic.shape, intrinsic.dtype)
-
-
-    ## Step 1. Pixel coordinates (p in the above eq.)
+                   
+    ## Pixel coordinates (p in the above eq.)    
+    intrinsic = np.copy(intrinsic_org)
+    x_ratio = 0.1
+    y_ratio = 0.1
+    intrinsic[0] *= x_ratio
+    intrinsic[1] *= y_ratio
+    depth = cv2.resize(depth_org, None, fx=x_ratio, fy=y_ratio)
     height, width = depth.shape
 
-    ## Step 2. pixel coordinate => camera coordinate (real-world coordinate)
-    intrinsic_inv = np.linalg.inv(intrinsic)
-    coordinates = np.dot(intrinsic_inv, pixel_coordinates)
-    coordinates = np.swapaxes(coordinates, 0, 1)
+    ## Calculate the amount of the overlapping area    
+    num_total = height * width
+    num_overlap = 0
 
-    ## Step 3. 3-D position reconstruction
-    depth = depth.flatten().reshape(-1, 1)
-    coordinates = np.multiply(coordinates, depth)
+    for i in range(height):  # y-direction
+        for j in range(width):  # x-direction
+            temp = np.dot(np.linalg.inv(intrinsic), np.array([j, i, 1], dtype=float).reshape(3, 1))  # temp = (X, Y, 1)
+            temp = (depth[i, j]) * temp  # temp = (X', Y', Z')
+            temp = np.dot(rel_pose, np.append(temp, [1]).reshape(4, 1))
+            temp = temp / float(temp[3] + 1e-10)
+            temp = np.dot(intrinsic, temp[:3])
+            temp = temp / float(temp[2] + 1e-10)
+            x, y = int(temp[0]), int(temp[1])
+            if x >= 0 and x < width and y >= 0 and y < height:
+                num_overlap += 1
 
-    ## Step 4. Reprojection
-    # homogeneous coordinate for 3-D points
-    coordinates = np.hstack((coordinates, np.ones((coordinates.shape[0], 1))))
-    coordinates = np.swapaxes(coordinates, 0, 1)
-    coordinates = np.swapaxes(np.dot(pose, coordinates), 0, 1)
-    # normalization for 3-D points
-    # print(coordinates, coordinates.shape, coordinates.dtype)
-    coordinates = coordinates[:, :3] / (coordinates[:, 3][:, None] + 1e-10)
-    # reprojection
-    coordinates = np.swapaxes(coordinates, 0, 1)
-    coordinates = np.swapaxes(np.dot(intrinsic, coordinates), 0, 1)
-    # normalization for 2-D points
-    coordinates = coordinates[:, :2] / (coordinates[:, 2][:, None] + 1e-10)
-
-
-    ## Step 5. Calculate the amount of the overlapping area
-    # Randomly sample 1000 points
-    coordinates = random.sample(coordinates, num_coordinate_samples)
-    coordinates = np.stack(coordinates)
-    overlapping_points = coordinates[(coordinates[:, 0] < width) & (coordinates[:, 1] < height) \
-                                     & (coordinates[:, 0] > 0) & (coordinates[:, 1] > 0)]
-    if overlapping_points.size > 0:
-        minX, minY = overlapping_points.min(axis=0)
-        maxX, maxY = overlapping_points.max(axis=0)
-
-        overlapping_area = (maxX - minX) * (maxY - minY) / (width * height)
-        overlapping_area = min(overlapping_area, 1.0)
-    else:
-        overlapping_area = 0.0
+    overlapping_area = num_overlap / num_total
 
     return overlapping_area
 
