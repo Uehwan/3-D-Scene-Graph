@@ -142,10 +142,10 @@ class testImageLoader(object):
             # Preprocess loaded camera parameter and depth info
             depth_pix = depth_img.load()
             pix_depth = []
-            for ii in range(depth_img.size[0]):
+            for ii in range(depth_img.size[1]):
                 pix_row = []
-                for jj in range(depth_img.size[1]):
-                    pix_row.append(depth_pix[ii, jj])
+                for jj in range(depth_img.size[0]):
+                    pix_row.append(depth_pix[jj, ii])
                 pix_depth.append(pix_row)
 
             camera_pose = [item.split() for item in camera_pose.split('\n')[:-1]]
