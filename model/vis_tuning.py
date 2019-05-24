@@ -18,7 +18,7 @@ from collections import Counter
 import pcl
 import os.path as osp
 import os
-
+fasttext = torchtext.vocab.FastText()
 _GRAY = (218, 227, 218)
 _GREEN = (18, 127, 15)
 _WHITE = (255, 255, 255)
@@ -30,8 +30,6 @@ class same_node_detection(object):
         self.class_weight = 10.0/20.0
         self.pose_weight = 8.0/20.0
         self.color_weight = 2.0/20.0
-        self.fasttext = torchtext.vocab.FastText()
-        self.TFCO = tools_for_compare_objects()
 
     def compare_class(self, curr_cls, prev_cls, cls_score ):
         similar_cls = False
@@ -58,13 +56,13 @@ class same_node_detection(object):
                 similarity = 0
                 for i in range(3):
                     for j in range(3):
-                        similarity += cosine_similarity(self.fasttext.vectors[self.fasttext.stoi[curr_cls[i]]].cuda(),
-                                                        self.fasttext.vectors[self.fasttext.stoi[prev_cls[j]]].cuda(),dim=0).cpu()[0]
+                        similarity += cosine_similarity(fasttext.vectors[fasttext.stoi[curr_cls[i]]].cuda(),
+                                                        fasttext.vectors[fasttext.stoi[prev_cls[j]]].cuda(),dim=0).cpu()[0]
                 similarity /= 9.0
             #print(similarity)
             else:
-                similarity = cosine_similarity(self.fasttext.vectors[self.fasttext.stoi[curr_cls[0]]].cuda(),
-                                               self.fasttext.vectors[self.fasttext.stoi[prev_cls[0]]].cuda(), dim=0).cpu()[0]
+                similarity = cosine_similarity(fasttext.vectors[fasttext.stoi[curr_cls[0]]].cuda(),
+                                            fasttext.vectors[fasttext.stoi[prev_cls[0]]].cuda(), dim=0).cpu()[0]
 
             #score = similarity * cls_score
             score = 0.
@@ -72,7 +70,7 @@ class same_node_detection(object):
         return score
 
     def compare_position(self, curr_mean, curr_var, prev_mean, prev_var, prev_pt_num, new_pt_num):
-        I_x, I_y, I_z = self.TFCO.check_distance(curr_mean,curr_var, prev_mean, prev_var)
+        I_x, I_y, I_z = TFCO.check_distance(curr_mean,curr_var, prev_mean, prev_var) 
         #score = (I_x * I_y * I_z)
         score = (I_x/3.0) + (I_y/3.0) + (I_z/3.0)
         score = float(score)
@@ -101,9 +99,9 @@ class same_node_detection(object):
                 #print("compare object : {comp_cls:3}".format(comp_cls=prev_cls[0]))
                 prev_mean, prev_var, prev_pt_num = global_node.ix[i]["mean"], global_node.ix[i]["var"], global_node.ix[i]["pt_num"]
                 prev_color_hist = global_node.ix[i]["color_hist"]
-                cls_sc = self.compare_class(curr_cls, prev_cls, cls_score)
-                pos_sc = self.compare_position(curr_mean,curr_var, prev_mean, prev_var, prev_pt_num, new_pt_num)
-                col_sc = self.compare_color(curr_color_hist, prev_color_hist)
+                cls_sc = SND.compare_class(curr_cls, prev_cls, cls_score)
+                pos_sc = SND.compare_position(curr_mean,curr_var, prev_mean, prev_var, prev_pt_num, new_pt_num)
+                col_sc = SND.compare_color(curr_color_hist, prev_color_hist)
                 #print("class_score {cls_score:3.2f}".format(cls_score=cls_sc))
                 #print("pose_score {pos_score:3.2f}".format(pos_score=pos_sc))
                 #print("color_score {col_score:3.2f}".format(col_score=col_sc))
@@ -126,8 +124,7 @@ class find_objects_class_and_color(object):
     def __init__(self):
         self.power = 2
 
-    @staticmethod
-    def get_class_string(class_index, score, dataset):
+    def get_class_string(self, class_index, score, dataset):
         class_text = dataset[class_index] if dataset is not None else \
             'id{:d}'.format(class_index)
         return class_text + ' {:0.2f}'.format(score).lstrip('0')
@@ -146,7 +143,7 @@ class find_objects_class_and_color(object):
         try:
             closest_name = actual_name = webcolors.rgb_to_name(requested_colour)
         except ValueError:
-            closest_name = self.closest_colour(requested_colour)
+            closest_name = FOCC.closest_colour(requested_colour)
             actual_name = None
         return actual_name, closest_name
 
@@ -155,11 +152,10 @@ class find_objects_class_and_color(object):
 
 class tools_for_compare_objects(object):
     def __init__(self):
-        self.meter = 1000.
-        self.th_x = 0.9
-        self.th_y = 0.9
-        self.th_z = 0.9
-        self.FOCC = find_objects_class_and_color()
+        self.meter = 5000.
+        self.th_x = 0.112
+        self.th_y = 0.112
+        self.th_z = 0.112
 
     def check_distance(self, x,curr_var, mean, var):
         Z_x = (x[0]-mean[0])/self.meter
@@ -256,14 +252,14 @@ class tools_for_compare_objects(object):
         color_hist = []
         start = 0
         new_color = False
-        actual_name, closest_name = self.FOCC.get_colour_name(img[0])
+        actual_name, closest_name = FOCC.get_colour_name(img[0])
         if (actual_name == None):
             color_hist.append([0,closest_name])
         else:
             color_hist.append([0,actual_name])
 
         for i in range(len(img)):
-            actual_name, closest_name = self.FOCC.get_colour_name(img[i])
+            actual_name, closest_name = FOCC.get_colour_name(img[i])
             for k in range(len(color_hist)):
                 if(color_hist[k][1] == actual_name or color_hist[k][1] == closest_name):
                     color_hist[k][0]+=1
@@ -294,7 +290,7 @@ class tools_for_compare_objects(object):
             # cv2.waitKey(1)
         except:
 
-            return self.get_color_hist(img)
+            return TFCO.get_color_hist(img)
         else:
             densities = hist3D.colorDensities()
             order = densities.argsort()[::-1]
@@ -302,7 +298,7 @@ class tools_for_compare_objects(object):
             colors = (255*hist3D.rgbColors()[order]).astype(int)
             color_hist = []
             for density, color in zip(densities,colors)[:4]:
-                actual_name, closest_name = self.FOCC.get_colour_name(color.tolist())
+                actual_name, closest_name = FOCC.get_colour_name(color.tolist())
                 if (actual_name == None):
                     color_hist.append([density, closest_name])
                 else:
@@ -335,34 +331,33 @@ class resampling_boundingbox_size(object):
 
     def make_window_size(self, width, height, obj_boxes):
         if( width<30):
-            range_x_min = int(obj_boxes[0]) + int(width*2./10.) 
-            range_x_max = int(obj_boxes[0]) + int(width*8./10.)
+            range_x_min = int(obj_boxes[0]) + int(width*3./10.) 
+            range_x_max = int(obj_boxes[0]) + int(width*7./10.)
         elif(width < 60):
-            range_x_min = int(obj_boxes[0]) + int(width*3./20.)
-            range_x_max = int(obj_boxes[0]) + int(width*17./20.)
+            range_x_min = int(obj_boxes[0]) + int(width*8./20.)
+            range_x_max = int(obj_boxes[0]) + int(width*12./20.)
         else:
-            range_x_min = int(obj_boxes[0]) + int(width*4./30.)
-            range_x_max = int(obj_boxes[0]) + int(width*26./30.)
+            range_x_min = int(obj_boxes[0]) + int(width*12./30.)
+            range_x_max = int(obj_boxes[0]) + int(width*18./30.)
             
         if (height < 30):
-            range_y_min = int(obj_boxes[1]) + int(height*2./10.)
-            range_y_max = int(obj_boxes[1]) + int(height*8./10.)
+            range_y_min = int(obj_boxes[1]) + int(height*3./10.)
+            range_y_max = int(obj_boxes[1]) + int(height*7./10.)
         elif (height < 60):
-            range_y_min = int(obj_boxes[1]) + int(height*3./20.)
-            range_y_max = int(obj_boxes[1]) + int(height*17./20.)
+            range_y_min = int(obj_boxes[1]) + int(height*8./20.)
+            range_y_max = int(obj_boxes[1]) + int(height*12./20.)
         else:
-            range_y_min = int(obj_boxes[1]) + int(height*4./30.)
-            range_y_max = int(obj_boxes[1]) + int(height*26./30.)
+            range_y_min = int(obj_boxes[1]) + int(height*12./30.)
+            range_y_max = int(obj_boxes[1]) + int(height*18./30.)
 
         return range_x_min, range_x_max, range_y_min, range_y_max
 
 
 
 class tools_for_visualizing(object):
-    def __init__(self,args):
+    def __init(self):
         self.color = _GREEN
         self.thick = 1
-        self.args = args
 
     def vis_bbox_opencv(self, img, bbox):
         """Visualizes a bounding box."""
@@ -372,15 +367,17 @@ class tools_for_visualizing(object):
         cv2.rectangle(img, (x0, y0), (x1, y1), self.color, thickness=self.thick)
         return img
 
-    def Draw_connected_scene_graph(self, node_feature, relation, img_count, test_set, sg, idx,
-                                   cnt_thres =2, view=True, save_path = './vis_result/'):
+    def Draw_connected_scene_graph(self, node_feature, relation, img_count, test_set, sg, idx, cnt_thres =2, view=True, save_path = './vis_result/'):
         # load all of saved node_feature
         # if struct ids are same, updated to newly typed object
         #print('node_feature:',node_feature)
         tile_idx = []
         handle_idx = []
-        tomato_rgb = [255,99,71]
+        #tomato_rgb = [255,99,71]
+        tomato_rgb = [236,93,87]
+        blue_rgb = [81,167,250]
         tomato_hex = webcolors.rgb_to_hex(tomato_rgb)
+        blue_hex = webcolors.rgb_to_hex(blue_rgb)
         for node_num in range(len(node_feature)):
             if node_feature.ix[node_num]['detection_cnt'] < cnt_thres: continue
             if len(node_feature.ix[node_num]["color_hist"]) ==1:
@@ -398,16 +395,21 @@ class tools_for_visualizing(object):
                 handle_idx.append(str(node["idx"]))
             else:
                 sg.node('struct'+str(node["idx"]), shape='box', style='filled,rounded',
-                    label= obj_cls+
-                    "_"+str(node["idx"])+"\n"+
-                    "("+str(node["3d_pose"][0])+","+
-                        str(node["3d_pose"][1])+","+
-                        str(node["3d_pose"][2])+ ")",
+                    label= obj_cls+"_"+str(node["idx"]), margin = '0.11, 0.0001', width='0.11', height='0',
                     fillcolor= tomato_hex, fontcolor = 'black')
-                if self.args.draw_color:
-                    sg.node('color'+str(node["idx"]), shape= 'box', style= 'filled,rounded',
-                             fillcolor = 'skyblue',fontcolor='black', label=node_feature.ix[node_num]["color_hist"][0][1])
-                    sg.edge('struct'+str(node["idx"]), 'color'+str(node["idx"]))
+                sg.node('attribute_pose_'+str(node["idx"]), shape='box', style='filled, rounded',
+                    label = "("+str(round(float(node["3d_pose"][0])/5000.0, 1))+","+
+                                str(round(float(node["3d_pose"][1])/5000.0, 1))+","+
+                                str(round(float(node["3d_pose"][2])/5000.0, 1))+ ")",
+                    margin = '0.11, 0.0001', width='0.11', height='0',
+                    fillcolor= blue_hex, fontcolor='black')
+                
+                sg.node('attribute_color_'+str(node["idx"]), shape='box', style='filled, rounded',
+                    label = str(node_feature.ix[node_num]["color_hist"][0][1]),
+                    margin = '0.11, 0.0001', width='0.11', height='0',
+                    fillcolor= blue_hex, fontcolor='black')
+                sg.edge('struct'+str(node["idx"]), 'attribute_pose_'+str(node["idx"]))
+                sg.edge('struct'+str(node["idx"]), 'attribute_color_'+str(node["idx"]))
                 '''
                 # Apply color to scene graph node
                 # Works for later
@@ -475,7 +477,8 @@ class tools_for_visualizing(object):
             relation_set = set(relation_set)
             #print(len(relation_set))
 
-        pale_rgb = [152,251,152]
+        #pale_rgb = [152,251,152]
+        pale_rgb = [112,191,64]
         pale_hex = webcolors.rgb_to_hex(pale_rgb)
         for rel_num in range(len(relation_set)):
             rel = relation_set.pop()
@@ -489,7 +492,7 @@ class tools_for_visualizing(object):
                     handle = True
             if ( (not tile) and (not handle)):
                 sg.node('rel'+str(rel_num), shape= 'box', style= 'filled, rounded', fillcolor= pale_hex, fontcolor= 'black',
-                        label= str(test_set.predicate_classes[rel[1]]))
+                        margin = '0.11, 0.0001', width = '0.11', height='0' , label= str(test_set.predicate_classes[rel[1]]))
                 sg.edge('struct'+str(rel[0]), 'rel'+str(rel_num))
                 sg.edge('rel'+str(rel_num), 'struct'+str(rel[2]))
 
@@ -499,35 +502,37 @@ class tools_for_visualizing(object):
         elif view and sg.format == 'png':
             sg.render(osp.join(save_path, 'scene_graph' + str(idx)), view=False)
             img = cv2.imread(osp.join(save_path, 'scene_graph' + str(idx)+'.png'),cv2.IMREAD_COLOR)
-            if img.shape[1]<int(1920*0.9) and img.shape[0]<int(1080*0.9):
-                pad = cv2.resize(img.copy(),(int(1920*0.9),int(1080*0.9)))
+	    resize_x = 0.65
+	    resize_y = 0.9
+            if img.shape[1]<int(1920*resize_x) and img.shape[0]<int(1080*resize_y):
+                pad = cv2.resize(img.copy(),(int(1920*resize_x),int(1080*resize_y)))
                 pad.fill(255)
                 pad[:img.shape[0], :img.shape[1], :] = img
                 resized = pad
-            elif img.shape[1]<int(1920*0.9):
-                pad = cv2.resize(img.copy(), (int(1920 * 0.9), int(1080 * 0.9)))
+            elif img.shape[1]<int(1920*resize_x):
+                pad = cv2.resize(img.copy(), (int(1920 * resize_x), int(1080 * resize_y)))
                 pad.fill(255)
-                img = cv2.resize(img, (img.shape[1], int(1080 * 0.9)))
+                img = cv2.resize(img, (img.shape[1], int(1080 * resize_y)))
                 pad[:img.shape[0], :img.shape[1], :] = img
                 resized = pad
-            elif img.shape[0]<int(1080*0.9):
-                pad = cv2.resize(img.copy(), (int(1920 * 0.9), int(1080 * 0.9)))
+            elif img.shape[0]<int(1080*resize_y):
+                pad = cv2.resize(img.copy(), (int(1920 *resize_x), int(1080 * resize_y)))
                 pad.fill(255)
-                img = cv2.resize(img, (int(1920 * 0.9), img.shape[0]))
+                img = cv2.resize(img, (int(1920 * resize_x), img.shape[0]))
                 pad[:img.shape[0], :img.shape[1], :] = img
                 resized = pad
             else:
-                resized = cv2.resize(img,(int(1920*0.9),int(1080*0.9)))
+                resized = cv2.resize(img,(int(1920*resize_x),int(1080*resize_y)))
             cv2.imshow('3D Scene Graph', resized)
-            cv2.moveWindow('3D Scene Graph',1920,0)
+            #cv2.moveWindow('3D Scene Graph',1920,0)
+	    cv2.moveWindow('3D Scene Graph',650,0)
             cv2.waitKey(1)
 
         node_feature.to_json(osp.join(save_path,'json','scene_graph_node'+str(idx)+'.json'), orient = 'index')
         relation.to_json(osp.join(save_path,'json','scene_graph_relation'+str(idx)+'.json'), orient = 'index')
         #sg.clear()
 
-    @staticmethod
-    def vis_object_detection(image_scene,test_set,
+    def vis_object_detection(self, image_scene,test_set,
                         obj_inds,obj_boxes,obj_scores):
 
         for i, obj_ind in enumerate(obj_inds):
@@ -537,7 +542,7 @@ class tools_for_visualizing(object):
                           colorlist[int(obj_boxes[i][4])],
                           2)
             font_scale=0.5
-            txt =str(int(obj_boxes[i][4])) + '. ' + find_objects_class_and_color.get_class_string(obj_ind,obj_scores[i],test_set.object_classes)
+            txt =str(int(obj_boxes[i][4])) + '. ' + FOCC.get_class_string(obj_ind,obj_scores[i],test_set.object_classes)
             ((txt_w, txt_h), _) = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
             # Place text background.
             x0, y0 = int(obj_boxes[i][0]),int(obj_boxes[i][3])
@@ -558,6 +563,11 @@ class tools_for_visualizing(object):
 
 colorlist = [(random.randint(0,230),random.randint(0,230),random.randint(0,230)) for i in range(10000)]
 
+SND = same_node_detection()
+FOCC = find_objects_class_and_color()
+TFCO = tools_for_compare_objects()
+RBS = resampling_boundingbox_size()
+TFV = tools_for_visualizing()
 
 class scene_graph(object):
     def __init__(self,args):
@@ -587,12 +597,6 @@ class scene_graph(object):
         if self.disable_samenode: self.detect_cnt_thres=0
         self.format = args.format
 
-        self.SND = same_node_detection()
-        self.RBS = resampling_boundingbox_size()
-        self.TFV = tools_for_visualizing(args)
-
-
-
     def vis_scene_graph(self, image_scene, idx, test_set, obj_inds, obj_boxes, obj_scores,
                         subject_inds, predicate_inds, object_inds,
                         subject_IDs, object_IDs, triplet_scores,relationships,
@@ -617,7 +621,7 @@ class scene_graph(object):
                 #     [[362        ,'red' ],[2          ,'blue'],...,[3          ,'gray']]
                 box_whole_img = image_scene[int(obj_boxes[i][1]):int(obj_boxes[i][3]),
                                 int(obj_boxes[i][0]):int(obj_boxes[i][2])]
-                color_hist = self.SND.TFCO.get_color_hist2(box_whole_img)
+                color_hist = TFCO.get_color_hist2(box_whole_img)
 
 
                 '''2. Get Center Patch '''
@@ -628,7 +632,7 @@ class scene_graph(object):
                 box_center_y = int(obj_boxes[i][1]) + height/2
                 # using belows to find mean and variance of each bounding boxes
                 # pop 1/5 size window_box from object bounding boxes 
-                range_x_min, range_x_max, range_y_min, range_y_max = self.RBS.make_window_size(width, height, obj_boxes[i])
+                range_x_min, range_x_max, range_y_min, range_y_max = RBS.make_window_size(width, height, obj_boxes[i])
                 # Crop center patch
                 box_center_img = image_scene[range_y_min:range_y_max, range_x_min:range_x_max]
 
@@ -638,9 +642,9 @@ class scene_graph(object):
                 for pt_x in range(range_x_min, range_x_max):
                     for pt_y in range(range_y_min, range_y_max):
                         pose_2d_window = np.matrix([pt_x, pt_y, 1])
-                        pose_3d_window = pix_depth[pt_x][pt_y] * np.matmul(inv_p_matrix, pose_2d_window.transpose())
+                        pose_3d_window = (pix_depth[pt_y][pt_x]) * np.matmul(inv_p_matrix, pose_2d_window.transpose())
                         pose_3d_world_coord_window = np.matmul(inv_R, pose_3d_window[0:3] - Trans.transpose())
-                        if not self.RBS.isNoisyPoint(pose_3d_world_coord_window):
+                        if not RBS.isNoisyPoint(pose_3d_world_coord_window):
                             # save several points in window_box to calculate mean and variance
                             window_3d_pts.append([pose_3d_world_coord_window.item(0), pose_3d_world_coord_window.item(1), pose_3d_world_coord_window.item(2)])
                 # window_3d_pts
@@ -657,7 +661,7 @@ class scene_graph(object):
                 #             window_3d_pts.append([pose_3d_world_coord_window.item(0), pose_3d_world_coord_window.item(1), pose_3d_world_coord_window.item(2)])
 
 
-                window_3d_pts = self.RBS.outlier_filter(window_3d_pts)
+                window_3d_pts = RBS.outlier_filter(window_3d_pts)
 
                 #window_3d_pts = np.array(window_3d_pts,dtype=np.float32)
                 #cloud = pcl.PointCloud()
@@ -686,7 +690,7 @@ class scene_graph(object):
 
                 '''4. Get a 3D position of the Center Patch's Center point'''
                 # find 3D point of the bounding box(the center patch)'s center
-                curr_pt_num, curr_mean, curr_var = self.SND.TFCO.Measure_new_Gaussian_distribution(window_3d_pts)
+                curr_pt_num, curr_mean, curr_var = TFCO.Measure_new_Gaussian_distribution(window_3d_pts)
                 # ex: np.matrix([[X_1],[Y_1],[Z_1]])
 
                 # get object class names as strings
@@ -705,7 +709,7 @@ class scene_graph(object):
                 if(self.img_count ==0):
                     # first image -> make new node
                     box_id = i
-                    self.pt_num, self.mean, self.var = self.SND.TFCO.Measure_new_Gaussian_distribution(window_3d_pts)
+                    self.pt_num, self.mean, self.var = TFCO.Measure_new_Gaussian_distribution(window_3d_pts)
                     # check
                     start_data = {"class":cls_scores, "idx":box_id, "score":box_score,
                                   "bounding_box":[box_center_x,box_center_y,width,height],
@@ -725,7 +729,7 @@ class scene_graph(object):
 
                 else:
                     # get node similarity score
-                    node_score, max_score_index = self.SND.node_update(window_3d_pts, self.data, curr_mean,curr_var,
+                    node_score, max_score_index = SND.node_update(window_3d_pts, self.data, curr_mean,curr_var,
                                                               box_cls, obj_scores[i], color_hist,test_set)
                     threshold = 0.8127
                     
@@ -738,7 +742,7 @@ class scene_graph(object):
 
                         #self.data.at[max_score_index, "class"] = box_cls
                         self.data.at[max_score_index, "score"] = node_score
-                        self.pt_num, self.mean, self.var = self.SND.TFCO.Measure_added_Gaussian_distribution(window_3d_pts,
+                        self.pt_num, self.mean, self.var = TFCO.Measure_added_Gaussian_distribution(window_3d_pts,
                                                                                 self.data.ix[max_score_index]["mean"],
                                                                                 self.data.ix[max_score_index]["var"],
                                                                                 self.data.ix[max_score_index]["pt_num"],
@@ -755,7 +759,7 @@ class scene_graph(object):
                         # [class, index, score, bounding_box, 3d_pose, mean, var, pt_number, color_hist]
                         box_id = len(self.data)+1
                         obj_boxes[i][4] = box_id
-                        self.pt_num, self.mean, self.var = self.SND.TFCO.Measure_new_Gaussian_distribution(window_3d_pts)
+                        self.pt_num, self.mean, self.var = TFCO.Measure_new_Gaussian_distribution(window_3d_pts)
                         global_node_num = len(self.data)
                         add_node_list = [cls_scores, box_id, box_score, [box_center_x, box_center_y, width, height],
                                          [self.mean[0], self.mean[1], self.mean[2]],
@@ -827,8 +831,8 @@ class scene_graph(object):
         rel_new_num = len(self.rel_data)
 
         # Draw scene graph
-        if ( rel_prev_num != rel_new_num):
-            self.TFV.Draw_connected_scene_graph(self.data, self.rel_data, self.img_count, test_set, sg, idx,
+        if ( rel_prev_num != rel_new_num): 
+            TFV.Draw_connected_scene_graph(self.data, self.rel_data, self.img_count, test_set, sg, idx,
                                        self.detect_cnt_thres,self.args.plot_graph,self.save_path)
         #sg.view()
 
@@ -836,5 +840,4 @@ class scene_graph(object):
         self.img_count+=1
 
         return updated_image_scene
-
 
