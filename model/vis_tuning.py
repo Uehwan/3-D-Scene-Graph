@@ -597,7 +597,7 @@ class scene_graph(object):
         if self.disable_samenode: self.detect_cnt_thres=0
         self.format = args.format
 
-    def vis_scene_graph(self, image_scene, idx, test_set, obj_inds, obj_boxes, obj_scores,
+    def vis_scene_graph(self, image_scene, camera_pose, idx, test_set, obj_inds, obj_boxes, obj_scores,
                         subject_inds, predicate_inds, object_inds,
                         subject_IDs, object_IDs, triplet_scores,relationships,
                         pix_depth=None, inv_p_matrix=None, inv_R=None, Trans=None, dataset ='scannet'):
@@ -643,7 +643,10 @@ class scene_graph(object):
                     for pt_y in range(range_y_min, range_y_max):
                         pose_2d_window = np.matrix([pt_x, pt_y, 1])
                         pose_3d_window = (pix_depth[pt_y][pt_x]) * np.matmul(inv_p_matrix, pose_2d_window.transpose())
-                        pose_3d_world_coord_window = np.matmul(inv_R, pose_3d_window[0:3] - Trans.transpose())
+			pose_3d = np.matrix([pose_3d_window.item(0), pose_3d_window.item(1), pose_3d_window.item(2), 1], dtype='float')
+			pose_3d_world_coord_window = np.matmul(camera_pose, pose_3d.transpose())
+                        # pose_3d_world_coord_window = np.matmul(inv_R, pose_3d_window[0:3] - Trans.transpose())
+			
                         if not RBS.isNoisyPoint(pose_3d_world_coord_window):
                             # save several points in window_box to calculate mean and variance
                             window_3d_pts.append([pose_3d_world_coord_window.item(0), pose_3d_world_coord_window.item(1), pose_3d_world_coord_window.item(2)])
