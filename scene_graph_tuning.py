@@ -181,7 +181,7 @@ for idx in range(imgLoader.num_frames)[args.frame_start:args.frame_end]:
         cv2.imwrite(osp.join(args.vis_result_path, scene_name,'detection',str(idx) + '.jpg'), img_obj_detected)
 
     ''' 6. Merge Relations into 3D Scene Graph'''
-    updated_image_scene = scene_graph.vis_scene_graph(image_scene.copy(), idx, test_set,
+    updated_image_scene = scene_graph.vis_scene_graph(image_scene.copy(), camera_pose, idx, test_set,
                                                       obj_cls, obj_boxes, obj_scores,
                                                       subject_inds, predicate_inds, object_inds,
                                                       subject_IDs, object_IDs, triplet_scores,relationships,
