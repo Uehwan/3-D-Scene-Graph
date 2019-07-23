@@ -1,5 +1,5 @@
 # 3D-Scene-Graph: *A Sparse and Semantic Representation of Physical Environments for Intelligent Agents*
-This work is based on our paper (IEEE Transactions on Cybernetics 2019, under minor revision). we proposed a new concept called 3D scene graph and its construction framework. Our work is based on [FactorizableNet](https://github.com/yikang-li/FactorizableNet), implemented in Pytorch.
+This work is based on our paper (IEEE Transactions on Cybernetics 2019, accepted). We proposed a new concept called 3D scene graph and its construction framework. Our work is based on [FactorizableNet](https://github.com/yikang-li/FactorizableNet), implemented in Pytorch.
 
 ## 3D Scene Graph Construction Framework
 The  proposed  3D  scene  graph  construction  framework  extracts  relevant  semantics  within  environments such  as  object categories  and  relations  between  objects  as  well  as  physical attributes 
@@ -145,7 +145,7 @@ Visualization Settings:
 
 ## Demo Video
 
-[![Video Label](http://img.youtube.com/vi/DpW7eyF2HiI/0.jpg)](https://youtu.be/DpW7eyF2HiI)
+[![Video Label](http://img.youtube.com/vi/RF4bf7ZlAX4/0.jpg)](https://www.youtube.com/watch?v=RF4bf7ZlAX4)
 
 ## Citations
 
@@ -156,7 +156,7 @@ The following is a BibTeX reference.
 @article{kim2019graph3d,
   title={3D-Scene-Graph: A Sparse and Semantic Representation of Physical Environments for Intelligent Agents},
   author={Kim, Ue-Hwan and Park, Jin-Man and Song, Taek-Jin and Kim, Jong-Hwan},
-  journal={IEEE Cybernetics, under minor revision},
+  journal={IEEE Cybernetics},
   year={2019}
 }
 ```
