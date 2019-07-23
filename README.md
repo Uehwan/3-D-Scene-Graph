@@ -140,7 +140,7 @@ Visualization Settings:
 
 ## Result
 
-![scores1](./vis_result/fig/result1.png)
+![scores1](./vis_result/fig/result.png)
 
 
 ## Demo Video
